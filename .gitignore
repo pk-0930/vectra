@@ -1,0 +1,27 @@
+# OS files
+.DS_Store
+
+# Local scratch docs
+TEMP_FILE.md
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+mobility-ai-service/venv/
+
+# Backend generated files
+mobility-ai-service/uploads/
+mobility-ai-service/frames/
+mobility-ai-service/outputs/
+
+# Frontend generated files
+vectra-ui/node_modules/
+vectra-ui/dist/

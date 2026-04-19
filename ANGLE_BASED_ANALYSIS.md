@@ -7,11 +7,15 @@ Vectra works for side view and front view videos. But even then the views should
 
 ### Flaw improvisation
 
+```text
 "Vectra should be excellent at knowing when to analyze the video and when and what rules to apply for that video." 
+```
 
 It should not force user to record in any angle. With the available video, Vectra should try to detect and apply rules based on the video and send response. As of now, we are building the Vectra for fitness coaches, so video quality based on the video angle can be marked so that the user would know if it is good or moderate or not sufficient to apply rules. So if it is good then we basically mean that we could apply all the view based rules to that video, for example if it is side view we could apply rep detection, depth detection and torso lean perfectly. If moderate we could detect what rules can realiable results and we apply that rules only and we can provide a response based on that. A "not sufficient" video cannot apply any rules as the video was not of a perfect anlge to apply any rules and we fail gracefully. 
 
+```text
 "Vectra should be in a way that the user should not think that the product is unreliable, they should feel "I uploaded from the wrong angle"".
+```
 
 ### What to keep in mind
 

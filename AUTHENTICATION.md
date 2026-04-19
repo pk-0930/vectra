@@ -4,7 +4,7 @@
 
 ### Authenticating from Backend Service
 
-As of now, the UI validates the user credentials and signs them in to the platform. The credentials are hard coded as username = "admin" and password = "admin" in the UI component (in App.tsx file). Lets keep the same username and password but the authentication should happen from backend. This provides more security to our backend apis in future when we introduce database and persisting user credentials.
+As of now, the UI validates the user credentials and signs them in to the platform. The credentials are hard coded as `username = "admin"` and `password = "admin"` in the UI component (in App.tsx file). Lets keep the same username and password but the authentication should happen from backend. This provides more security to our backend apis in future when we introduce database and persisting user credentials.
 
 ### Technical Consideration
 

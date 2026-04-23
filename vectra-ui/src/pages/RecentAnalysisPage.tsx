@@ -7,6 +7,7 @@ import type { SquatJobResponse } from "../types/squat";
 type RecentAnalysisPageProps = {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
+  onLogout: () => void;
   onOpenAnalysis: (job: SquatJobResponse) => void;
   selectedJobId?: string | null;
 };
@@ -14,6 +15,7 @@ type RecentAnalysisPageProps = {
 export default function RecentAnalysisPage({
   activeTab,
   onTabChange,
+  onLogout,
   onOpenAnalysis,
   selectedJobId,
 }: RecentAnalysisPageProps) {
@@ -101,17 +103,20 @@ export default function RecentAnalysisPage({
 
       <main style={styles.main}>
         <div style={styles.header}>
-          <div>
-            <h1 style={styles.pageTitle}>Recent Analysis</h1>
-            <p style={styles.pageSubtitle}>
-              Past squat analyses with annotated snapshots ready for quick reopen.
-            </p>
-          </div>
+        <div>
+          <h1 style={styles.pageTitle}>Recent Analysis</h1>
+          <p style={styles.pageSubtitle}>
+            Past squat analyses with annotated snapshots ready for quick reopen.
+          </p>
+        </div>
 
+        <div style={styles.headerActions}>
+          <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
           <button style={styles.refreshButton} onClick={loadJobs} disabled={isLoading}>
             {isLoading ? "Refreshing..." : "Refresh list"}
           </button>
         </div>
+      </div>
 
         {error ? <div style={styles.errorBox}>{error}</div> : null}
 
@@ -371,6 +376,19 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#64748b",
   },
   refreshButton: {
+    padding: "10px 14px",
+    borderRadius: "12px",
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  headerActions: {
+    display: "flex",
+    gap: "12px",
+  },
+  secondaryButton: {
     padding: "10px 14px",
     borderRadius: "12px",
     border: "1px solid #cbd5e1",

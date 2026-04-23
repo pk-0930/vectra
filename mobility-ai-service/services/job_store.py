@@ -1,51 +1,19 @@
 import json
-import os
-import sqlite3
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
+from config.postgres_config import get_postgres_config
+from repositories.job_repository import PostgresJobRepository
 
-def utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class JobStore:
-    def __init__(self, db_path: str = "jobs.db"):
-        self.db_path = db_path
-        self._ensure_parent_directory()
-        self._initialize()
-
-    def _ensure_parent_directory(self):
-        parent_dir = os.path.dirname(self.db_path)
-        if parent_dir:
-            os.makedirs(parent_dir, exist_ok=True)
-
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        return connection
-
-    def _initialize(self):
-        with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS jobs (
-                    id TEXT PRIMARY KEY,
-                    analysis_type TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    original_filename TEXT NOT NULL,
-                    stored_filename TEXT NOT NULL,
-                    video_path TEXT NOT NULL,
-                    result_json TEXT,
-                    error_message TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    started_at TEXT,
-                    completed_at TEXT
-                )
-                """
-            )
-            connection.commit()
+    def __init__(self, repository=None):
+        self.repository = repository or PostgresJobRepository(get_postgres_config())
+        self.repository.initialize()
 
     def create_job(
         self,
@@ -54,139 +22,72 @@ class JobStore:
         analysis_type: str,
         original_filename: str,
         stored_filename: str,
-        video_path: str,
+        video_blob_name: str,
     ) -> dict[str, Any]:
-        timestamp = utc_now_iso()
-
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO jobs (
-                    id,
-                    analysis_type,
-                    status,
-                    original_filename,
-                    stored_filename,
-                    video_path,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    job_id,
-                    analysis_type,
-                    "queued",
-                    original_filename,
-                    stored_filename,
-                    video_path,
-                    timestamp,
-                    timestamp,
-                ),
-            )
-            connection.commit()
-
-        return self.get_job(job_id)
+        timestamp = utc_now()
+        row = self.repository.insert_job(
+            {
+                "id": job_id,
+                "analysis_type": analysis_type,
+                "status": "queued",
+                "original_filename": original_filename,
+                "stored_filename": stored_filename,
+                "video_blob_name": video_blob_name,
+                "result_json": None,
+                "error_message": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+        return self._row_to_job(row)
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM jobs WHERE id = ?",
-                (job_id,),
-            ).fetchone()
-
+        row = self.repository.fetch_job(job_id)
         if row is None:
             return None
-
         return self._row_to_job(row)
 
     def list_jobs(self, *, limit: int = 20) -> list[dict[str, Any]]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT *
-                FROM jobs
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+        return [self._row_to_job(row) for row in self.repository.fetch_jobs(limit)]
 
-        return [self._row_to_job(row) for row in rows]
+    def mark_job_running(self, job_id: str) -> dict[str, Any] | None:
+        row = self.repository.mark_job_running(job_id, utc_now())
+        if row is None:
+            return None
+        return self._row_to_job(row)
 
-    def claim_next_queued_job(self) -> dict[str, Any] | None:
-        with self._connect() as connection:
-            row = connection.execute(
-                """
-                SELECT id
-                FROM jobs
-                WHERE status = 'queued'
-                ORDER BY created_at ASC
-                LIMIT 1
-                """
-            ).fetchone()
+    def mark_job_completed(self, job_id: str, result: dict[str, Any]) -> dict[str, Any] | None:
+        now = utc_now()
+        row = self.repository.update_job_completion(
+            job_id,
+            result_json=json.dumps(result),
+            error_message=None,
+            status="completed",
+            updated_at=now,
+            completed_at=now,
+        )
+        return self._row_to_job(row) if row else None
 
-            if row is None:
-                return None
+    def mark_job_failed(self, job_id: str, error_message: str) -> dict[str, Any] | None:
+        now = utc_now()
+        row = self.repository.update_job_completion(
+            job_id,
+            result_json=None,
+            error_message=error_message,
+            status="failed",
+            updated_at=now,
+            completed_at=now,
+        )
+        return self._row_to_job(row) if row else None
 
-            now = utc_now_iso()
-            cursor = connection.execute(
-                """
-                UPDATE jobs
-                SET status = 'running',
-                    started_at = ?,
-                    updated_at = ?
-                WHERE id = ? AND status = 'queued'
-                """,
-                (now, now, row["id"]),
-            )
-            connection.commit()
-
-            if cursor.rowcount != 1:
-                return None
-
-        return self.get_job(row["id"])
-
-    def mark_job_completed(self, job_id: str, result: dict[str, Any]) -> dict[str, Any]:
-        now = utc_now_iso()
-
-        with self._connect() as connection:
-            connection.execute(
-                """
-                UPDATE jobs
-                SET status = 'completed',
-                    result_json = ?,
-                    error_message = NULL,
-                    updated_at = ?,
-                    completed_at = ?
-                WHERE id = ?
-                """,
-                (json.dumps(result), now, now, job_id),
-            )
-            connection.commit()
-
-        return self.get_job(job_id)
-
-    def mark_job_failed(self, job_id: str, error_message: str) -> dict[str, Any]:
-        now = utc_now_iso()
-
-        with self._connect() as connection:
-            connection.execute(
-                """
-                UPDATE jobs
-                SET status = 'failed',
-                    error_message = ?,
-                    updated_at = ?,
-                    completed_at = ?
-                WHERE id = ?
-                """,
-                (error_message, now, now, job_id),
-            )
-            connection.commit()
-
-        return self.get_job(job_id)
-
-    def _row_to_job(self, row: sqlite3.Row) -> dict[str, Any]:
+    def _row_to_job(self, row: dict[str, Any]) -> dict[str, Any]:
         result_json = row["result_json"]
+        if isinstance(result_json, str):
+            result_payload = json.loads(result_json)
+        else:
+            result_payload = result_json
 
         return {
             "id": row["id"],
@@ -194,11 +95,11 @@ class JobStore:
             "status": row["status"],
             "original_filename": row["original_filename"],
             "stored_filename": row["stored_filename"],
-            "video_path": row["video_path"],
-            "result": json.loads(result_json) if result_json else None,
+            "video_blob_name": row["video_blob_name"],
+            "result": result_payload,
             "error_message": row["error_message"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-            "started_at": row["started_at"],
-            "completed_at": row["completed_at"],
+            "created_at": row["created_at"].isoformat(),
+            "updated_at": row["updated_at"].isoformat(),
+            "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+            "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
         }

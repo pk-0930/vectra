@@ -25,6 +25,24 @@ class FrameExtractor:
         cap.release()
         return frame_count, output_folder
 
+    def extract_frames_to_folder(self, video_path: str, output_folder: str):
+        os.makedirs(output_folder, exist_ok=True)
+
+        cap = cv2.VideoCapture(video_path)
+        frame_count = 0
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+
+            frame_path = os.path.join(output_folder, f"frame_{frame_count}.jpg")
+            cv2.imwrite(frame_path, frame)
+            frame_count += 1
+
+        cap.release()
+        return frame_count, output_folder
+
 
 def save_frame(video_path: str, frame_number: int, output_path: str):
     cap = cv2.VideoCapture(video_path)

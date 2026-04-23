@@ -15,7 +15,7 @@ function getStoredLoginState() {
     return false;
   }
 
-  return window.localStorage.getItem(AUTH_STORAGE_KEY) === "true";
+  return window.sessionStorage.getItem(AUTH_STORAGE_KEY) === "true";
 }
 
 function getStoredActiveTab(): AppTab {
@@ -50,7 +50,7 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState<SquatJobResponse | null>(null);
 
   useEffect(() => {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, String(isLoggedIn));
+    window.sessionStorage.setItem(AUTH_STORAGE_KEY, String(isLoggedIn));
   }, [isLoggedIn]);
 
   useEffect(() => {
@@ -81,6 +81,16 @@ export default function App() {
     }
   };
 
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setActiveTab("dashboard");
+    setSelectedJob(null);
+    setUsername("");
+    setPassword("");
+    setError("");
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  };
+
   if (!isLoggedIn) {
     return (
       <LoginPage
@@ -101,6 +111,7 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         selectedJobId={selectedJob?.id ?? null}
+        onLogout={handleLogout}
         onOpenAnalysis={(job) => {
           setSelectedJob(job);
           setActiveTab("dashboard");
@@ -110,13 +121,20 @@ export default function App() {
   }
 
   if (activeTab !== "dashboard") {
-    return <PlaceholderPage activeTab={activeTab} onTabChange={setActiveTab} />;
+    return (
+      <PlaceholderPage
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
     <DashboardPage
       activeTab={activeTab}
       onTabChange={setActiveTab}
+      onLogout={handleLogout}
       requestedJob={selectedJob}
       onJobLoaded={setSelectedJob}
     />

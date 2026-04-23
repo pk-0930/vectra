@@ -4,6 +4,7 @@ import type { AppTab } from "../types/navigation";
 type PlaceholderPageProps = {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
+  onLogout: () => void;
 };
 
 const pageCopy: Record<Exclude<AppTab, "dashboard" | "recent-analysis">, {
@@ -31,6 +32,7 @@ const pageCopy: Record<Exclude<AppTab, "dashboard" | "recent-analysis">, {
 export default function PlaceholderPage({
   activeTab,
   onTabChange,
+  onLogout,
 }: PlaceholderPageProps) {
   const copy = pageCopy[activeTab as keyof typeof pageCopy];
 
@@ -65,6 +67,10 @@ export default function PlaceholderPage({
 
       <main style={styles.main}>
         <div style={styles.panel}>
+          <div style={styles.panelTopRow}>
+            <div />
+            <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
+          </div>
           <h1 style={styles.pageTitle}>{copy.title}</h1>
           <p style={styles.pageSubtitle}>{copy.subtitle}</p>
           <div style={styles.bodyText}>
@@ -189,6 +195,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "36px",
     boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
   },
+  panelTopRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: "8px",
+  },
   pageTitle: {
     margin: 0,
     fontSize: "32px",
@@ -206,5 +217,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "15px",
     color: "#64748b",
     lineHeight: 1.7,
+  },
+  secondaryButton: {
+    padding: "10px 14px",
+    borderRadius: "12px",
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
+    fontWeight: 600,
+    cursor: "pointer",
   },
 };

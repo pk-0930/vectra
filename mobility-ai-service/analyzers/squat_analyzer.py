@@ -234,10 +234,11 @@ class SquatAnalyzer:
         pose_results,
         preferred_side=None,
         rep_depths=None,
-        rep_torso_lean=None
+        rep_torso_lean=None,
+        annotated_output_folder: str = "outputs/frames",
     ):
         video_name = self._safe_video_name(video_path)
-        output_dir = "outputs/frames"
+        output_dir = annotated_output_folder
         os.makedirs(output_dir, exist_ok=True)
         pose_map = {
             pose["frame_index"]: pose
@@ -287,7 +288,13 @@ class SquatAnalyzer:
             "rep_frames": rep_frames
         }
 
-    def _build_front_view_frame(self, video_path: str, pose_results, knee_tracking):
+    def _build_front_view_frame(
+        self,
+        video_path: str,
+        pose_results,
+        knee_tracking,
+        annotated_output_folder: str = "outputs/frames",
+    ):
         evaluated_frame = knee_tracking.get("evaluated_frame")
         if evaluated_frame is None:
             return {
@@ -295,7 +302,7 @@ class SquatAnalyzer:
             }
 
         video_name = self._safe_video_name(video_path)
-        output_dir = "outputs/frames"
+        output_dir = annotated_output_folder
         os.makedirs(output_dir, exist_ok=True)
         pose_map = {
             pose["frame_index"]: pose
@@ -432,7 +439,13 @@ class SquatAnalyzer:
         )
         return response
 
-    def analyze(self, pose_results, video_path: str, frames_folder: str | None = None):
+    def analyze(
+        self,
+        pose_results,
+        video_path: str,
+        frames_folder: str | None = None,
+        annotated_output_folder: str = "outputs/frames",
+    ):
         view_result = self.view_classifier.classify(pose_results)
         video_view = view_result["video_view"]
         view_suitability = view_result.get("view_suitability", "not_sufficient")
@@ -519,6 +532,7 @@ class SquatAnalyzer:
                 preferred_side=preferred_side,
                 rep_depths=depth_result.get("rep_depths", []),
                 rep_torso_lean=torso_lean_result.get("rep_torso_lean", []),
+                annotated_output_folder=annotated_output_folder,
             )
 
             response["frames"] = frames
@@ -552,7 +566,8 @@ class SquatAnalyzer:
             frames = self._build_front_view_frame(
                 video_path=video_path,
                 pose_results=pose_results,
-                knee_tracking=knee_tracking_result.get("knee_tracking", {})
+                knee_tracking=knee_tracking_result.get("knee_tracking", {}),
+                annotated_output_folder=annotated_output_folder,
             )
 
             response.update(knee_tracking_result)

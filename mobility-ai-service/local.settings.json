@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=vectrastorage001;AccountKey=Hc2qt6LFb80DtmXCMk1cQCTFJvkeEh/8/PJaq8S5t6oGgty+GfnBhTEPofm85DOsZzXtond/zbEx+AStNXvfrg==;EndpointSuffix=core.windows.net",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "BLOB_UPLOADS_CONTAINER": "uploads",
+    "BLOB_FRAMES_CONTAINER": "frames",
+    "BLOB_ANNOTATED_FRAMES_CONTAINER": "annotated-frames",
+    "ANALYSIS_JOBS_QUEUE_NAME": "analysis-jobs",
+    "POSTGRES_HOST": "psql-vectra.postgres.database.azure.com",
+    "POSTGRES_PORT": "5432",
+    "POSTGRES_DB": "Vectra",
+    "POSTGRES_USER": "vectraadmin",
+    "POSTGRES_PASSWORD": "admin@123",
+    "POSTGRES_SSLMODE": "require"
+  }
+}

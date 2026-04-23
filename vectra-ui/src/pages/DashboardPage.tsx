@@ -11,6 +11,7 @@ import type {
 type DashboardPageProps = {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
+  onLogout: () => void;
   requestedJob?: SquatJobResponse | null;
   onJobLoaded?: (job: SquatJobResponse) => void;
 };
@@ -18,6 +19,7 @@ type DashboardPageProps = {
 export default function DashboardPage({
   activeTab,
   onTabChange,
+  onLogout,
   requestedJob,
   onJobLoaded,
 }: DashboardPageProps) {
@@ -339,6 +341,7 @@ export default function DashboardPage({
           </div>
 
           <div style={styles.headerButtons}>
+            <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
             <button style={styles.secondaryButton}>Request front view</button>
             <button style={styles.primaryButton}>Share feedback</button>
           </div>

@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 import unittest
 from unittest.mock import Mock, patch
 
+from services.queue_job_processor import process_queue_message
 from services.job_store import JobStore
-from worker import process_queue_message
 
 
 class InMemoryJobRepository:
@@ -125,14 +125,14 @@ class JobStoreTests(unittest.TestCase):
             video_blob_name="job-3/job-3_demo.mp4",
         )
 
-        with self.assertRaises(RuntimeError):
-            process_queue_message(
-                store,
-                Mock(run_squat_job=Mock(side_effect=RuntimeError("processing failed"))),
-                {"job_id": "job-3", "analysis_type": "squat"},
-            )
+        processed = process_queue_message(
+            store,
+            Mock(run_squat_job=Mock(side_effect=RuntimeError("processing failed"))),
+            {"job_id": "job-3", "analysis_type": "squat"},
+        )
 
         failed_job = store.get_job("job-3")
+        self.assertFalse(processed)
         self.assertEqual(failed_job["status"], "failed")
         self.assertEqual(failed_job["error_message"], "processing failed")
 

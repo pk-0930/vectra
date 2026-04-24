@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from analyzers.mobility_analyzer import analyze_mobility
 from analyzers.squat_analyzer import SquatAnalyzer
+from config.local_settings_loader import load_local_settings
 from services.blob_storage_service import BlobStorageService
 from services.job_runner import JobRunner
 from services.job_store import JobStore
@@ -15,6 +16,8 @@ from services.login_service import LoginService
 from services.queue_service import QueueService
 from shared.frame_extractor import FrameExtractor
 from shared.pose_analyzer import PoseAnalyzer
+
+load_local_settings()
 
 app = FastAPI()
 

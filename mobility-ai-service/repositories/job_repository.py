@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime
+import logging
 
 try:
     import psycopg
@@ -112,7 +113,9 @@ class PostgresJobRepository:
                 return cursor.fetchall()
 
     def mark_job_running(self, job_id: str, started_at: datetime) -> dict | None:
+        logging.info("postgres connect")
         with self._connect() as connection:
+            logging.info("conn sucess")
             with connection.cursor() as cursor:
                 cursor.execute(
                     """

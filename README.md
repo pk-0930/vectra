@@ -109,6 +109,8 @@ MobilityDetectionSystem/
 
 The backend now reads infra settings from environment variables. For local Azure Functions runs, these are supplied through `mobility-ai-service/local.settings.json`. For Azure deployment, the same values should be configured as Function App Application Settings.
 
+For local development, `mobility-ai-service/local.settings.json` is now auto-loaded by the FastAPI app, the queue worker, and the Azure Function entrypoint when those values are not already present in the environment.
+
 ### Required Environment Variables
 
 - `AzureWebJobsStorage` or `BLOB_STORAGE_CONNECTION_STRING`
@@ -177,6 +179,12 @@ This uses:
 - `host.json` for the function host
 - `local.settings.json` for local-only environment variables
 
+The same `local.settings.json` file is also used automatically when running `uvicorn app:app --reload` or `python worker.py` locally.
+
+Important note:
+
+- `host.json` configures Azure Queue processing with `"messageEncoding": "none"` because the backend currently enqueues plain JSON text messages rather than Base64-encoded payloads.
+
 ### 4. Start the Frontend
 
 From [`vectra-ui`](/Users/padmakumar0930/Vectra/MobilityDetectionSystem/vectra-ui):
@@ -236,6 +244,8 @@ npm run build
 - After Azure deployment, configure the same keys as Azure Function App Application Settings.
 - Do not rely on checked-in local secrets for production.
 - The current Azure Function scaffold is queue-triggered and reuses the same job-processing path as the local worker entrypoint.
+- Keep the `host.json` queue extension setting aligned with the current producer format:
+  - `"extensions": { "queues": { "messageEncoding": "none" } }`
 
 ## Notes
 

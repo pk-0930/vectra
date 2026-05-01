@@ -25,3 +25,5 @@ mobility-ai-service/outputs/
 # Frontend generated files
 vectra-ui/node_modules/
 vectra-ui/dist/
+mobility-ai-service/local.settings.json
+local.settings.json

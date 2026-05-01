@@ -1,0 +1,54 @@
+name: Build and deploy Vectra API to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "mobility-ai-service/**"
+      - ".github/workflows/deploy-vectra-api.yml"
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-vectra
+  ACR_NAME: acrvectra
+  ACR_LOGIN_SERVER: acrvectra.azurecr.io
+  IMAGE_NAME: vectra-api
+  CONTAINER_APP_NAME: ca-vectra-api
+  CONTAINER_APP_ENV: cae-vectra
+  DOCKERFILE_PATH: mobility-ai-service/Dockerfile
+  BUILD_CONTEXT: mobility-ai-service
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1E33DEBB110941468AFF81033D1F451A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_545D8A612571456FA307D330AD66CA80 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DA7711E5606546459E62C2CC9441523C }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build \
+            -f ${{ env.DOCKERFILE_PATH }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.BUILD_CONTEXT }}
+
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest

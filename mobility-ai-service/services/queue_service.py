@@ -1,5 +1,5 @@
 from config.queue_storage_config import get_queue_storage_config
-from repositories.queue_repository import AzureQueueRepository
+from repositories.queue_repository import AzureQueueRepository, QueueMessage
 
 
 class QueueService:
@@ -21,3 +21,9 @@ class QueueService:
                 "analysis_type": analysis_type,
             }
         )
+
+    def receive_analysis_job(self, *, visibility_timeout: int = 1800) -> QueueMessage | None:
+        return self.repository.receive_message(visibility_timeout=visibility_timeout)
+
+    def delete_analysis_job(self, message: QueueMessage):
+        self.repository.delete_message(message)

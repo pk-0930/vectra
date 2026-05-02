@@ -1,9 +1,17 @@
 import json
+from dataclasses import dataclass
 
 try:
     from azure.storage.queue import QueueClient
 except ImportError:  # pragma: no cover
     QueueClient = None
+
+
+@dataclass(frozen=True)
+class QueueMessage:
+    id: str
+    pop_receipt: str
+    content: str
 
 
 class AzureQueueRepository:
@@ -31,3 +39,17 @@ class AzureQueueRepository:
 
     def send_message(self, payload: dict):
         self._get_client().send_message(json.dumps(payload))
+
+    def receive_message(self, *, visibility_timeout: int = 1800) -> QueueMessage | None:
+        message = self._get_client().receive_message(visibility_timeout=visibility_timeout)
+        if message is None:
+            return None
+
+        return QueueMessage(
+            id=message.id,
+            pop_receipt=message.pop_receipt,
+            content=message.content,
+        )
+
+    def delete_message(self, message: QueueMessage):
+        self._get_client().delete_message(message.id, message.pop_receipt)

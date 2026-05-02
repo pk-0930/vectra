@@ -1,4 +1,4 @@
-name: Build and deploy Vectra API to Azure Container Apps
+name: Build and push Vectra API and Worker images
 
 on:
   push:
@@ -13,10 +13,12 @@ env:
   RESOURCE_GROUP: rg-vectra
   ACR_NAME: acrvectra
   ACR_LOGIN_SERVER: acrvectra.azurecr.io
-  IMAGE_NAME: vectra-api
-  CONTAINER_APP_NAME: ca-vectra-api
-  CONTAINER_APP_ENV: cae-vectra
-  DOCKERFILE_PATH: mobility-ai-service/Dockerfile
+
+  API_IMAGE_NAME: vectra-api
+  WORKER_IMAGE_NAME: vectra-worker
+
+  API_DOCKERFILE_PATH: mobility-ai-service/Dockerfile
+  WORKER_DOCKERFILE_PATH: mobility-ai-service/Dockerfile.worker
   BUILD_CONTEXT: mobility-ai-service
 
 jobs:
@@ -41,14 +43,28 @@ jobs:
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      - name: Build and push Docker image
+      - name: Build and push API Docker image
         run: |
           IMAGE_TAG=${{ github.sha }}
+
           docker build \
-            -f ${{ env.DOCKERFILE_PATH }} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            -f ${{ env.API_DOCKERFILE_PATH }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${IMAGE_TAG} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:latest \
             ${{ env.BUILD_CONTEXT }}
 
-          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
-          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${IMAGE_TAG}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:latest
+
+      - name: Build and push Worker Docker image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+
+          docker build \
+            -f ${{ env.WORKER_DOCKERFILE_PATH }} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKER_IMAGE_NAME }}:${IMAGE_TAG} \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKER_IMAGE_NAME }}:latest \
+            ${{ env.BUILD_CONTEXT }}
+
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKER_IMAGE_NAME }}:${IMAGE_TAG}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.WORKER_IMAGE_NAME }}:latest

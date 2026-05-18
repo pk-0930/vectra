@@ -372,6 +372,15 @@ async def upload_progress_photo(
     return photo
 
 
+@app.get("/client-progress-photos/{blob_name:path}")
+async def get_progress_photo(blob_name: str, coach: dict = Depends(get_current_coach)):
+    try:
+        payload, media_type = storage_asset_service.get_progress_photo(blob_name)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Progress photo not found: {blob_name}") from exc
+    return Response(content=payload, media_type=media_type)
+
+
 @app.get("/clients/{client_id}/nutrition-plans", response_model=list[PlanResponse])
 async def list_nutrition_plans(client_id: int, coach: dict = Depends(get_current_coach)):
     try:

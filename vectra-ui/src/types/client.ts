@@ -40,3 +40,13 @@ export type Goal = {
   end_date: string | null;
   is_current: boolean;
 };
+
+export type ProgressPhoto = {
+  id: number;
+  client_id: number;
+  blob_name: string;
+  caption: string | null;
+  timeline_type: string;
+  captured_on: string;
+  created_at: string;
+};

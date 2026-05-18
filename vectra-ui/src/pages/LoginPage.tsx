@@ -1,4 +1,6 @@
 import React from "react";
+import { Dumbbell, Lock, Sparkles } from "lucide-react";
+import { PRIMARY_BORDER, THEME } from "../theme";
 
 type LoginPageProps = {
   email: string;
@@ -36,6 +38,7 @@ export default function LoginPage({
   return (
     <div style={styles.page}>
       <div style={styles.card}>
+        <div style={styles.logoMark}><Dumbbell size={24} /></div>
         <h1 style={styles.title}>Vectra</h1>
         <p style={styles.subtitle}>Fitness Coach Client Management</p>
 
@@ -92,6 +95,7 @@ export default function LoginPage({
           {error ? <div style={styles.error}>{error}</div> : null}
 
           <button type="submit" style={styles.button} disabled={isSubmitting}>
+            {isSignup ? <Sparkles size={16} /> : <Lock size={16} />}
             {isSubmitting
               ? isSignup
                 ? "Creating account..."
@@ -112,21 +116,34 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f1f5f9",
+    background: THEME.gradients.app,
   },
   card: {
     width: "100%",
     maxWidth: "440px",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.9)",
     padding: "32px",
-    borderRadius: "20px",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    border: "1px solid #e2e8f0",
+    borderRadius: THEME.radii.panel,
+    boxShadow: THEME.shadows.cardHover,
+    border: `1px solid ${THEME.colors.border}`,
+  },
+  logoMark: {
+    width: "52px",
+    height: "52px",
+    borderRadius: THEME.radii.lg,
+    background: THEME.gradients.primary,
+    color: THEME.colors.white,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: "18px",
+    boxShadow: `0 14px 26px ${THEME.shadows.primarySoft}`,
   },
   title: {
     margin: 0,
     fontSize: "28px",
     fontWeight: 700,
+    color: THEME.colors.ink,
   },
   subtitle: {
     marginTop: "8px",
@@ -143,15 +160,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 14px",
     borderRadius: "10px",
     border: "1px solid #cbd5e1",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.72)",
     cursor: "pointer",
   },
   modeButtonActive: {
     padding: "10px 14px",
     borderRadius: "10px",
-    border: "1px solid #0f172a",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
+    border: PRIMARY_BORDER,
+    backgroundColor: THEME.colors.indigo,
+    color: THEME.colors.white,
     cursor: "pointer",
   },
   form: {
@@ -162,7 +179,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     padding: "12px 14px",
     borderRadius: "10px",
-    border: "1px solid #cbd5e1",
+    border: `1px solid ${THEME.colors.borderStrong}`,
     fontSize: "14px",
   },
   error: {
@@ -170,12 +187,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
   },
   button: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
     padding: "12px 14px",
     borderRadius: "10px",
     border: "none",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
+    backgroundColor: THEME.colors.indigo,
+    color: THEME.colors.white,
     fontSize: "14px",
     cursor: "pointer",
+    fontWeight: 700,
+    boxShadow: `0 12px 24px ${THEME.shadows.primarySoft}`,
   },
 };

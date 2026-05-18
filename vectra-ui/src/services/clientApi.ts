@@ -1,6 +1,6 @@
-import type { Client, ClientPayload, Goal, GoalPayload } from "../types/client";
+import type { Client, ClientPayload, Goal, GoalPayload, ProgressPhoto } from "../types/client";
 import { API_BASE_URL } from "./apiConfig";
-import { buildAuthHeaders } from "./session";
+import { buildAuthHeaders, getStoredAccessToken } from "./session";
 
 export async function listClients(): Promise<Client[]> {
   const response = await fetch(`${API_BASE_URL}/clients`, {
@@ -75,4 +75,56 @@ export async function addClientGoal(clientId: number, payload: GoalPayload): Pro
   }
 
   return (await response.json()) as Goal;
+}
+
+export async function listClientProgressPhotos(clientId: number): Promise<ProgressPhoto[]> {
+  const response = await fetch(`${API_BASE_URL}/clients/${clientId}/progress-photos`, {
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to load client progress photos (${response.status}): ${errorText}`);
+  }
+
+  return (await response.json()) as ProgressPhoto[];
+}
+
+export async function uploadClientProgressPhoto(
+  clientId: number,
+  payload: {
+    file: File;
+    timeline_type: string;
+    captured_on: string;
+    caption?: string;
+  }
+): Promise<ProgressPhoto> {
+  const formData = new FormData();
+  formData.append("file", payload.file);
+
+  const searchParams = new URLSearchParams({
+    timeline_type: payload.timeline_type,
+    captured_on: payload.captured_on,
+  });
+  if (payload.caption) {
+    searchParams.set("caption", payload.caption);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/clients/${clientId}/progress-photos?${searchParams.toString()}`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to upload progress photo (${response.status}): ${errorText}`);
+  }
+
+  return (await response.json()) as ProgressPhoto;
+}
+
+export function getClientProgressPhotoUrl(blobName: string) {
+  const token = getStoredAccessToken();
+  return `${API_BASE_URL}/client-progress-photos/${blobName}?token=${encodeURIComponent(token)}`;
 }

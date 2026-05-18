@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
@@ -143,6 +143,11 @@ export default function App() {
     setError("");
   };
 
+  const handleSelectClient = useCallback((client: Client) => {
+    setSelectedClient(client);
+    setSelectedClientId(client.id);
+  }, []);
+
   if (isBootstrapping) {
     return <div style={{ padding: 32, fontFamily: "sans-serif" }}>Loading coach workspace…</div>;
   }
@@ -179,7 +184,7 @@ export default function App() {
           if (job.client_id) {
             setSelectedClientId(job.client_id);
           }
-          setActiveTab("dashboard");
+          setActiveTab("clients");
         }}
       />
     );
@@ -192,10 +197,9 @@ export default function App() {
         onTabChange={setActiveTab}
         onLogout={handleLogout}
         selectedClientId={selectedClientId}
-        onSelectClient={(client) => {
-          setSelectedClient(client);
-          setSelectedClientId(client.id);
-        }}
+        onSelectClient={handleSelectClient}
+        requestedAnalysis={selectedJob}
+        onAnalysisLoaded={setSelectedJob}
       />
     );
   }

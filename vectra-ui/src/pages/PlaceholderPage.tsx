@@ -1,5 +1,8 @@
 import React from "react";
+import { Construction } from "lucide-react";
+import SideNav from "../components/SideNav";
 import type { AppTab } from "../types/navigation";
+import { THEME } from "../theme";
 
 type PlaceholderPageProps = {
   activeTab: AppTab;
@@ -38,32 +41,15 @@ export default function PlaceholderPage({
 
   return (
     <div style={styles.page}>
-      <aside style={styles.sidebar}>
-        <div style={styles.brandRow}>
-          <div style={styles.brandIcon}>V</div>
-          <div>
-            <div style={styles.brandTitle}>Vectra</div>
-            <div style={styles.brandSubtitle}>Trainer Workspace</div>
-          </div>
-        </div>
-
+      <SideNav activeTab={activeTab} onTabChange={onTabChange} subtitle="Trainer Workspace">
         <div style={styles.infoCard}>
-          <div style={styles.infoTitle}>In progress</div>
+          <div style={styles.infoTitle}><Construction size={16} /> In progress</div>
           <div style={styles.infoText}>
             This section is intentionally scaffolded so we can keep navigation stable while
             building the production beta feature set.
           </div>
         </div>
-
-        <div style={styles.navSection}>
-          {renderTabButton("dashboard", "Dashboard", activeTab, onTabChange)}
-          {renderTabButton("recent-analysis", "Recent Analysis", activeTab, onTabChange)}
-          {renderTabButton("clients", "Clients", activeTab, onTabChange)}
-          {renderTabButton("sessions", "Sessions", activeTab, onTabChange)}
-          {renderTabButton("insights", "Insights", activeTab, onTabChange)}
-          {renderTabButton("settings", "Settings", activeTab, onTabChange)}
-        </div>
-      </aside>
+      </SideNav>
 
       <main style={styles.main}>
         <div style={styles.panel}>
@@ -83,28 +69,11 @@ export default function PlaceholderPage({
   );
 }
 
-function renderTabButton(
-  tab: AppTab,
-  label: string,
-  activeTab: AppTab,
-  onTabChange: (tab: AppTab) => void
-) {
-  return (
-    <button
-      key={tab}
-      style={activeTab === tab ? styles.navItemActive : styles.navItem}
-      onClick={() => onTabChange(tab)}
-    >
-      {label}
-    </button>
-  );
-}
-
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
     display: "flex",
-    backgroundColor: "#f1f5f9",
+    background: THEME.gradients.app,
   },
   sidebar: {
     width: "280px",
@@ -122,8 +91,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: "40px",
     height: "40px",
     borderRadius: "14px",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
+    backgroundColor: THEME.colors.primary,
+    color: THEME.colors.white,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -138,13 +107,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#64748b",
   },
   infoCard: {
-    marginTop: "24px",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
-    borderRadius: "18px",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    color: THEME.colors.white,
+    borderRadius: THEME.radii.md,
     padding: "16px",
+    border: `1px solid rgba(37,99,235,0.24)`,
   },
   infoTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
     fontSize: "14px",
     fontWeight: 700,
     marginBottom: "8px",
@@ -189,11 +161,11 @@ const styles: Record<string, React.CSSProperties> = {
   panel: {
     width: "100%",
     maxWidth: "760px",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.88)",
     border: "1px solid #e2e8f0",
-    borderRadius: "28px",
+    borderRadius: THEME.radii.panel,
     padding: "36px",
-    boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+    boxShadow: `0 10px 30px ${THEME.shadows.primarySoft}`,
   },
   panelTopRow: {
     display: "flex",
@@ -204,7 +176,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "32px",
     fontWeight: 700,
-    color: "#0f172a",
+    color: THEME.colors.ink,
   },
   pageSubtitle: {
     marginTop: "10px",
@@ -219,11 +191,14 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.7,
   },
   secondaryButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
     padding: "10px 14px",
     borderRadius: "12px",
     border: "1px solid #cbd5e1",
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    color: THEME.colors.primaryDeep,
     fontWeight: 600,
     cursor: "pointer",
   },

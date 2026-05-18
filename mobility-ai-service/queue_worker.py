@@ -39,7 +39,7 @@ def mark_job_failed_if_present(job_service: JobService, payload: dict | None, er
     if not payload:
         return
 
-    job_id = payload.get("job_id")
+    job_id = payload.get("analysis_id") or payload.get("job_id")
     if not job_id:
         return
 
@@ -86,10 +86,11 @@ def main() -> int:
 
     try:
         payload = json.loads(message.content)
-        logging.info("Processing analysis queue message for job_id=%s", payload.get("job_id"))
+        analysis_identifier = payload.get("analysis_id") or payload.get("job_id")
+        logging.info("Processing analysis queue message for analysis_id=%s", analysis_identifier)
         process_queue_message(job_service, job_runner, payload)
         queue_service.delete_analysis_job(message)
-        logging.info("Queue message processed and deleted for job_id=%s", payload.get("job_id"))
+        logging.info("Queue message processed and deleted for analysis_id=%s", analysis_identifier)
         return 0
     except json.JSONDecodeError as exc:
         error_message = f"Invalid queue message JSON: {exc}"
@@ -121,8 +122,9 @@ def main() -> int:
         return 1
     except RetryableQueueProcessingError as exc:
         error_message = str(exc)
-        if payload and payload.get("job_id"):
-            job_service.requeue_job_for_retry(payload["job_id"], error_message)
+        analysis_id = payload.get("analysis_id") or payload.get("job_id") if payload else None
+        if analysis_id:
+            job_service.requeue_job_for_retry(analysis_id, error_message)
 
         if message.dequeue_count >= queue_config.max_dequeue_count:
             logging.exception(
@@ -145,8 +147,9 @@ def main() -> int:
         return 1
     except Exception as exc:
         error_message = str(exc)
-        if payload and payload.get("job_id"):
-            job_service.requeue_job_for_retry(payload["job_id"], error_message)
+        analysis_id = payload.get("analysis_id") or payload.get("job_id") if payload else None
+        if analysis_id:
+            job_service.requeue_job_for_retry(analysis_id, error_message)
 
         if message.dequeue_count >= queue_config.max_dequeue_count:
             logging.exception(

@@ -13,11 +13,11 @@ class RetryableQueueProcessingError(Exception):
 
 def process_queue_message(job_service: JobService, job_runner: JobRunner, message: dict) -> bool:
     logging.info("process queue message ENTER")
-    job_id = message.get("job_id")
+    job_id = message.get("analysis_id") or message.get("job_id")
     analysis_type = message.get("analysis_type")
 
     if not job_id:
-        raise NonRetryableQueueMessageError("Queue message is missing job_id.")
+        raise NonRetryableQueueMessageError("Queue message is missing analysis_id.")
 
     if analysis_type != "squat":
         raise NonRetryableQueueMessageError(f"Unsupported analysis type: {analysis_type}")

@@ -108,11 +108,13 @@ export type SquatJobStatus = "queued" | "running" | "completed" | "failed";
 
 export type SquatJobResponse = {
   id: string;
+  client_id: number | null;
   analysis_type: string;
   status: SquatJobStatus;
   original_filename: string;
   result: SquatApiResponse | null;
   error_message: string | null;
+  coach_feedback_note?: string | null;
   created_at: string;
   updated_at: string;
   started_at: string | null;
@@ -120,7 +122,7 @@ export type SquatJobResponse = {
 };
 
 export type SquatJobListResponse = {
-  jobs: SquatJobResponse[];
+  analyses: SquatJobResponse[];
 };
 
 export type RepFrame = {

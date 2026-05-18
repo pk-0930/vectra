@@ -27,6 +27,7 @@ class QueueService:
         self.repository.send_message(
             {
                 "job_id": job_id,
+                "analysis_id": job_id,
                 "analysis_type": analysis_type,
             }
         )

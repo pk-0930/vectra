@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { ClipboardList, RefreshCw } from "lucide-react";
+import SideNav from "../components/SideNav";
 import { API_BASE_URL } from "../services/apiConfig";
 import { listSquatJobs } from "../services/squatApi";
 import type { AppTab } from "../types/navigation";
 import type { SquatJobResponse } from "../types/squat";
+import { THEME } from "../theme";
 
 type RecentAnalysisPageProps = {
   activeTab: AppTab;
@@ -28,7 +31,7 @@ export default function RecentAnalysisPage({
       setIsLoading(true);
       setError("");
       const response = await listSquatJobs(24);
-      setJobs(response.jobs);
+      setJobs(response.analyses);
     } catch (loadError) {
       const message =
         loadError instanceof Error ? loadError.message : "Failed to load recent analyses.";
@@ -44,62 +47,15 @@ export default function RecentAnalysisPage({
 
   return (
     <div style={styles.page}>
-      <aside style={styles.sidebar}>
-        <div style={styles.brandRow}>
-          <div style={styles.brandIcon}>V</div>
-          <div>
-            <div style={styles.brandTitle}>Vectra</div>
-            <div style={styles.brandSubtitle}>Trainer Workspace</div>
-          </div>
-        </div>
-
+      <SideNav activeTab={activeTab} onTabChange={onTabChange} subtitle="Trainer Workspace">
         <div style={styles.infoCard}>
           <div style={styles.infoTitle}>Review library</div>
           <div style={styles.infoText}>
             Browse recent squat analyses, inspect annotated thumbnails, and reopen any
-            session in the dashboard.
+            session in its client workspace.
           </div>
         </div>
-
-        <div style={styles.navSection}>
-          <button
-            style={activeTab === "dashboard" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("dashboard")}
-          >
-            Dashboard
-          </button>
-          <button
-            style={activeTab === "recent-analysis" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("recent-analysis")}
-          >
-            Recent Analysis
-          </button>
-          <button
-            style={activeTab === "clients" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("clients")}
-          >
-            Clients
-          </button>
-          <button
-            style={activeTab === "sessions" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("sessions")}
-          >
-            Sessions
-          </button>
-          <button
-            style={activeTab === "insights" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("insights")}
-          >
-            Insights
-          </button>
-          <button
-            style={activeTab === "settings" ? styles.navItemActive : styles.navItem}
-            onClick={() => onTabChange("settings")}
-          >
-            Settings
-          </button>
-        </div>
-      </aside>
+      </SideNav>
 
       <main style={styles.main}>
         <div style={styles.header}>
@@ -113,6 +69,7 @@ export default function RecentAnalysisPage({
         <div style={styles.headerActions}>
           <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
           <button style={styles.refreshButton} onClick={loadJobs} disabled={isLoading}>
+            <RefreshCw size={16} />
             {isLoading ? "Refreshing..." : "Refresh list"}
           </button>
         </div>
@@ -122,9 +79,10 @@ export default function RecentAnalysisPage({
 
         {!jobs.length && !isLoading ? (
           <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}><ClipboardList size={20} /></div>
             <div style={styles.emptyTitle}>No analyses yet</div>
             <div style={styles.emptyText}>
-              Upload a squat video from the Dashboard tab to start building your review
+              Upload a squat video from a client's Form Analysis tab to start building your review
               history.
             </div>
           </div>
@@ -280,7 +238,7 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
     display: "flex",
-    backgroundColor: "#f1f5f9",
+    background: THEME.gradients.app,
   },
   sidebar: {
     width: "280px",
@@ -298,8 +256,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: "40px",
     height: "40px",
     borderRadius: "14px",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
+    backgroundColor: THEME.colors.primary,
+    color: THEME.colors.white,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -314,11 +272,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#64748b",
   },
   infoCard: {
-    marginTop: "24px",
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
-    borderRadius: "18px",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    color: THEME.colors.white,
+    borderRadius: THEME.radii.md,
     padding: "16px",
+    border: `1px solid rgba(37,99,235,0.24)`,
   },
   infoTitle: {
     fontSize: "14px",
@@ -370,17 +328,21 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "28px",
     fontWeight: 700,
+    color: THEME.colors.ink,
   },
   pageSubtitle: {
     margin: "8px 0 0 0",
     color: "#64748b",
   },
   refreshButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
     padding: "10px 14px",
     borderRadius: "12px",
     border: "1px solid #cbd5e1",
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    color: THEME.colors.primaryDeep,
     fontWeight: 600,
     cursor: "pointer",
   },
@@ -389,11 +351,14 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "12px",
   },
   secondaryButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
     padding: "10px 14px",
     borderRadius: "12px",
     border: "1px solid #cbd5e1",
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    color: THEME.colors.primaryDeep,
     fontWeight: 600,
     cursor: "pointer",
   },
@@ -406,7 +371,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "14px 16px",
   },
   emptyState: {
-    backgroundColor: "#ffffff",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    backgroundColor: "rgba(255,255,255,0.86)",
     border: "1px solid #e2e8f0",
     borderRadius: "24px",
     padding: "32px",
@@ -420,6 +388,17 @@ const styles: Record<string, React.CSSProperties> = {
   emptyText: {
     color: "#64748b",
   },
+  emptyIcon: {
+    width: "40px",
+    height: "40px",
+    borderRadius: THEME.radii.md,
+    backgroundColor: THEME.colors.energyMuted,
+    color: THEME.colors.accentDeep,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
@@ -427,21 +406,21 @@ const styles: Record<string, React.CSSProperties> = {
   },
   analysisCard: {
     border: "1px solid #e2e8f0",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.88)",
     borderRadius: "22px",
     padding: "14px",
     cursor: "pointer",
     textAlign: "left",
-    boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
+    boxShadow: THEME.shadows.card,
   },
   analysisCardActive: {
     border: "1px solid #93c5fd",
-    backgroundColor: "#eff6ff",
+    background: THEME.gradients.card,
     borderRadius: "22px",
     padding: "14px",
     cursor: "pointer",
     textAlign: "left",
-    boxShadow: "0 6px 18px rgba(59,130,246,0.12)",
+    boxShadow: THEME.shadows.cardHover,
   },
   thumbnailFrame: {
     width: "100%",
@@ -479,7 +458,7 @@ const styles: Record<string, React.CSSProperties> = {
   filename: {
     fontSize: "14px",
     fontWeight: 700,
-    color: "#0f172a",
+    color: THEME.colors.primary,
     wordBreak: "break-word",
   },
   metaRow: {

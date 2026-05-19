@@ -411,6 +411,46 @@ npm run build
 - `Dockerfile.worker` builds the worker image that starts `queue_worker.py`.
 - Do not rely on checked-in local secrets for production.
 
+### GitHub Actions
+
+The repository currently has separate workflows for backend and frontend deployment.
+
+#### Backend API and worker
+
+Workflow:
+
+```text
+.github/workflows/deploy-vectra-api.yml
+```
+
+Behavior:
+
+- Runs on `push` to `main` when files under `mobility-ai-service/**` change.
+- Can also be started manually with `workflow_dispatch`.
+- Builds and pushes two Docker images to Azure Container Registry:
+  - `vectra-api`
+  - `vectra-worker`
+- Tags each image with both the Git SHA and `latest`.
+
+#### Frontend Static Web App
+
+Workflow:
+
+```text
+.github/workflows/azure-static-web-apps-black-desert-0265d2900.yml
+```
+
+Behavior:
+
+- Runs only for changes under `vectra-ui/**` or the frontend workflow file.
+- On pull requests to `main`, it validates the frontend only:
+  - `npm ci`
+  - `npm run lint`
+  - `npm run build`
+- On `push` to `main`, it deploys the production Azure Static Web App.
+- Pull requests do **not** deploy Static Web App preview or production environments.
+- Merging a PR to `main` causes a single frontend production deployment from the resulting `push` event.
+
 ## Notes
 
 - Squat is the only currently implemented analysis type.

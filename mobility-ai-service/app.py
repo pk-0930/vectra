@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from config.local_settings_loader import load_local_settings
 from services.auth_service import AuthService
+from services.ai_plan_draft_service import AiPlanDraftService
 from services.blob_storage_service import BlobStorageService
 from services.client_service import ClientService
 from services.job_runner import JobRunner
@@ -35,6 +36,7 @@ job_runner = JobRunner()
 blob_storage_service = BlobStorageService()
 queue_service = QueueService()
 plan_service = PlanService()
+ai_plan_draft_service = AiPlanDraftService()
 pdf_service = PdfService()
 storage_asset_service = StorageAssetService()
 
@@ -159,6 +161,49 @@ class PlanResponse(BaseModel):
     created_by_coach_id: int
     created_at: str
     updated_at: str
+
+
+class PlanDraftCreatePayload(BaseModel):
+    plan_kind: str
+    period_type: str
+    period_start: str
+    period_end: str
+    dietary_preference: str | None = None
+    coach_prompt: str | None = None
+
+
+class PlanDraftUpdatePayload(BaseModel):
+    period_type: str
+    period_start: str
+    period_end: str
+    title: str
+    content: dict[str, Any]
+    coach_prompt: str | None = None
+
+
+class PlanDraftResponse(BaseModel):
+    id: int
+    client_id: int
+    coach_id: int
+    plan_kind: str
+    status: str
+    period_type: str
+    period_start: str
+    period_end: str
+    title: str
+    content: dict[str, Any]
+    source_context: dict[str, Any]
+    generation_preferences: dict[str, Any]
+    coach_prompt: str | None
+    model_name: str
+    created_at: str
+    updated_at: str
+    approved_plan_id: int | None
+
+
+class PlanDraftApprovalResponse(BaseModel):
+    draft: PlanDraftResponse
+    plan: PlanResponse
 
 
 class FormAnalysisResponse(BaseModel):
@@ -427,6 +472,78 @@ async def get_workout_plan(plan_id: int, coach: dict = Depends(get_current_coach
     if plan is None:
         raise HTTPException(status_code=404, detail="Workout plan not found.")
     return plan
+
+
+@app.post("/clients/{client_id}/plan-drafts", response_model=PlanDraftResponse)
+async def create_plan_draft(
+    client_id: int,
+    payload: PlanDraftCreatePayload,
+    coach: dict = Depends(get_current_coach),
+):
+    try:
+        return ai_plan_draft_service.create_draft(coach["id"], client_id, payload.model_dump())
+    except ValueError as exc:
+        status_code = 400 if "Unsupported" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@app.get("/clients/{client_id}/plan-drafts", response_model=list[PlanDraftResponse])
+async def list_plan_drafts(
+    client_id: int,
+    plan_kind: str | None = Query(default=None),
+    coach: dict = Depends(get_current_coach),
+):
+    try:
+        return ai_plan_draft_service.list_drafts(coach["id"], client_id, plan_kind)
+    except ValueError as exc:
+        status_code = 400 if "Unsupported" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@app.get("/plan-drafts/{draft_id}", response_model=PlanDraftResponse)
+async def get_plan_draft(draft_id: int, coach: dict = Depends(get_current_coach)):
+    draft = ai_plan_draft_service.get_draft(coach["id"], draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Plan draft not found.")
+    return draft
+
+
+@app.put("/plan-drafts/{draft_id}", response_model=PlanDraftResponse)
+async def update_plan_draft(
+    draft_id: int,
+    payload: PlanDraftUpdatePayload,
+    coach: dict = Depends(get_current_coach),
+):
+    try:
+        draft = ai_plan_draft_service.update_draft(coach["id"], draft_id, payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Plan draft not found.")
+    return draft
+
+
+@app.post("/plan-drafts/{draft_id}/approve", response_model=PlanDraftApprovalResponse)
+async def approve_plan_draft(draft_id: int, coach: dict = Depends(get_current_coach)):
+    try:
+        approval = ai_plan_draft_service.approve_draft(coach["id"], draft_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Plan draft not found.")
+    draft, plan = approval
+    return {"draft": draft, "plan": plan}
+
+
+@app.post("/plan-drafts/{draft_id}/discard", response_model=PlanDraftResponse)
+async def discard_plan_draft(draft_id: int, coach: dict = Depends(get_current_coach)):
+    try:
+        draft = ai_plan_draft_service.discard_draft(coach["id"], draft_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Plan draft not found.")
+    return draft
 
 
 def build_plan_pdf(plan_kind: str, plan: dict) -> bytes:

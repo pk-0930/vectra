@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Sparkles,
   Target,
   UserRound,
   Video,
@@ -29,12 +30,17 @@ import {
   uploadClientProgressPhoto,
 } from "../services/clientApi";
 import {
+  approvePlanDraft,
+  createPlanDraft,
   createNutritionPlan,
   createWorkoutPlan,
+  discardPlanDraft,
   getNutritionPlanPdfUrl,
   getWorkoutPlanPdfUrl,
+  listPlanDrafts,
   listNutritionPlans,
   listWorkoutPlans,
+  updatePlanDraft,
 } from "../services/planApi";
 import {
   createSquatJob,
@@ -47,7 +53,7 @@ import { getStoredAccessToken } from "../services/session";
 import { PRIMARY_BORDER, THEME } from "../theme";
 import type { Client, ProgressPhoto } from "../types/client";
 import type { AppTab } from "../types/navigation";
-import type { Plan, PlanPayload, PlanPeriodType } from "../types/plan";
+import type { DietaryPreference, Plan, PlanDraft, PlanKind, PlanPayload, PlanPeriodType } from "../types/plan";
 import type { SquatAnalysis, SquatApiResponse, SquatJobResponse } from "../types/squat";
 
 type ClientsPageProps = {
@@ -68,6 +74,8 @@ type DrawerName =
   | "add-progress-photo"
   | "create-nutrition-plan"
   | "create-workout-plan"
+  | "ai-nutrition-draft"
+  | "ai-workout-draft"
   | null;
 
 type PlanDraftState = {
@@ -79,7 +87,17 @@ type PlanDraftState = {
   focus: string;
   meals: string;
   workout_days: string;
+  mobility_drills: string;
+  stretching_plan: string;
   notes: string;
+};
+
+type AiDraftFormState = {
+  period_type: PlanPeriodType;
+  period_start: string;
+  period_end: string;
+  dietary_preference: DietaryPreference;
+  coach_prompt: string;
 };
 
 const initialPlanDraft = (): PlanDraftState => ({
@@ -91,7 +109,17 @@ const initialPlanDraft = (): PlanDraftState => ({
   focus: "",
   meals: "",
   workout_days: "",
+  mobility_drills: "",
+  stretching_plan: "",
   notes: "",
+});
+
+const initialAiDraftForm = (): AiDraftFormState => ({
+  period_type: "weekly",
+  period_start: "",
+  period_end: "",
+  dietary_preference: "no_preference",
+  coach_prompt: "",
 });
 
 export default function ClientsPage({
@@ -109,6 +137,8 @@ export default function ClientsPage({
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [nutritionPlans, setNutritionPlans] = useState<Plan[]>([]);
   const [workoutPlans, setWorkoutPlans] = useState<Plan[]>([]);
+  const [nutritionAiDrafts, setNutritionAiDrafts] = useState<PlanDraft[]>([]);
+  const [workoutAiDrafts, setWorkoutAiDrafts] = useState<PlanDraft[]>([]);
   const [analysisHistory, setAnalysisHistory] = useState<SquatJobResponse[]>([]);
   const [progressPhotos, setProgressPhotos] = useState<ProgressPhoto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +164,10 @@ export default function ClientsPage({
   });
   const [nutritionDraft, setNutritionDraft] = useState<PlanDraftState>(initialPlanDraft);
   const [workoutDraft, setWorkoutDraft] = useState<PlanDraftState>(initialPlanDraft);
+  const [nutritionAiDraftForm, setNutritionAiDraftForm] = useState<AiDraftFormState>(initialAiDraftForm);
+  const [workoutAiDraftForm, setWorkoutAiDraftForm] = useState<AiDraftFormState>(initialAiDraftForm);
+  const [nutritionAiDraftEdit, setNutritionAiDraftEdit] = useState<PlanDraftState>(initialPlanDraft);
+  const [workoutAiDraftEdit, setWorkoutAiDraftEdit] = useState<PlanDraftState>(initialPlanDraft);
   const [progressPhotoFile, setProgressPhotoFile] = useState<File | null>(null);
   const [progressPhotoForm, setProgressPhotoForm] = useState({
     timeline_type: "weekly",
@@ -149,6 +183,10 @@ export default function ClientsPage({
   const [isSavingGoal, setIsSavingGoal] = useState(false);
   const [isSavingNutrition, setIsSavingNutrition] = useState(false);
   const [isSavingWorkout, setIsSavingWorkout] = useState(false);
+  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
+  const [isSavingAiDraft, setIsSavingAiDraft] = useState(false);
+  const [isApprovingAiDraft, setIsApprovingAiDraft] = useState(false);
+  const [isDiscardingAiDraft, setIsDiscardingAiDraft] = useState(false);
   const [isSavingProgressPhoto, setIsSavingProgressPhoto] = useState(false);
   const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
@@ -160,6 +198,8 @@ export default function ClientsPage({
   const supportsDepth = analysis?.supported_analysis?.includes("depth") ?? false;
   const supportsTorsoLean = analysis?.supported_analysis?.includes("torso_lean") ?? false;
   const supportsKneeTracking = analysis?.supported_analysis?.includes("knee_tracking") ?? false;
+  const activeNutritionAiDraft = useMemo(() => getActiveAiDraft(nutritionAiDrafts), [nutritionAiDrafts]);
+  const activeWorkoutAiDraft = useMemo(() => getActiveAiDraft(workoutAiDrafts), [workoutAiDrafts]);
 
   const repRows = useMemo(() => {
     if (!analysis?.reps?.length) return [];
@@ -205,11 +245,21 @@ export default function ClientsPage({
     try {
       setIsDetailLoading(true);
       setError("");
-      const [client, fetchedNutritionPlans, fetchedWorkoutPlans, fetchedProgressPhotos, fetchedAnalyses] =
+      const [
+        client,
+        fetchedNutritionPlans,
+        fetchedWorkoutPlans,
+        fetchedNutritionDrafts,
+        fetchedWorkoutDrafts,
+        fetchedProgressPhotos,
+        fetchedAnalyses,
+      ] =
         await Promise.all([
           fetchClient(clientId),
           listNutritionPlans(clientId),
           listWorkoutPlans(clientId),
+          listPlanDrafts(clientId, "nutrition"),
+          listPlanDrafts(clientId, "workout"),
           listClientProgressPhotos(clientId),
           listClientSquatJobs(clientId, 24),
         ]);
@@ -218,6 +268,8 @@ export default function ClientsPage({
       onSelectClient(client);
       setNutritionPlans(fetchedNutritionPlans);
       setWorkoutPlans(fetchedWorkoutPlans);
+      setNutritionAiDrafts(fetchedNutritionDrafts);
+      setWorkoutAiDrafts(fetchedWorkoutDrafts);
       setProgressPhotos(fetchedProgressPhotos);
       setAnalysisHistory(fetchedAnalyses.analyses);
       setProfileForm({
@@ -287,6 +339,8 @@ export default function ClientsPage({
       setSelectedClient(null);
       setNutritionPlans([]);
       setWorkoutPlans([]);
+      setNutritionAiDrafts([]);
+      setWorkoutAiDrafts([]);
       setProgressPhotos([]);
       setAnalysisHistory([]);
       setSelectedAnalysisJob(null);
@@ -446,6 +500,129 @@ export default function ClientsPage({
       setError(saveError instanceof Error ? saveError.message : "Failed to create workout plan.");
     } finally {
       setIsSavingWorkout(false);
+    }
+  }
+
+  function openAiDraftDrawer(planKind: PlanKind) {
+    const activeDraft = planKind === "nutrition" ? activeNutritionAiDraft : activeWorkoutAiDraft;
+    if (activeDraft) {
+      setAiDraftEdit(planKind, planDraftToEditState(activeDraft));
+      setAiDraftForm(planKind, aiFormFromDraft(activeDraft));
+    }
+    setDrawer(planKind === "nutrition" ? "ai-nutrition-draft" : "ai-workout-draft");
+  }
+
+  async function handleGenerateAiDraft(planKind: PlanKind, e?: React.FormEvent<HTMLFormElement>) {
+    e?.preventDefault();
+    if (!selectedClient) return;
+    const form = planKind === "nutrition" ? nutritionAiDraftForm : workoutAiDraftForm;
+    try {
+      setIsGeneratingAiDraft(true);
+      setError("");
+      const draft = await createPlanDraft(selectedClient.id, {
+        plan_kind: planKind,
+        period_type: form.period_type,
+        period_start: form.period_start,
+        period_end: form.period_end,
+        dietary_preference: planKind === "nutrition" ? form.dietary_preference : undefined,
+        coach_prompt: form.coach_prompt || undefined,
+      });
+      upsertAiDraft(planKind, draft);
+      setAiDraftEdit(planKind, planDraftToEditState(draft));
+      setSuccessMessage("AI draft generated. Review before approving.");
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Failed to generate AI draft.");
+    } finally {
+      setIsGeneratingAiDraft(false);
+    }
+  }
+
+  async function handleSaveAiDraft(planKind: PlanKind) {
+    const draft = planKind === "nutrition" ? activeNutritionAiDraft : activeWorkoutAiDraft;
+    if (!draft) return null;
+    const edit = planKind === "nutrition" ? nutritionAiDraftEdit : workoutAiDraftEdit;
+    const form = planKind === "nutrition" ? nutritionAiDraftForm : workoutAiDraftForm;
+    try {
+      setIsSavingAiDraft(true);
+      setError("");
+      const saved = await updatePlanDraft(draft.id, {
+        period_type: edit.period_type,
+        period_start: edit.period_start,
+        period_end: edit.period_end,
+        title: edit.title,
+        content: buildPlanPayload(edit).content,
+        coach_prompt: form.coach_prompt || undefined,
+      });
+      upsertAiDraft(planKind, saved);
+      setSuccessMessage("AI draft saved.");
+      return saved;
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Failed to save AI draft.");
+      return null;
+    } finally {
+      setIsSavingAiDraft(false);
+    }
+  }
+
+  async function handleApproveAiDraft(planKind: PlanKind) {
+    const draft = planKind === "nutrition" ? activeNutritionAiDraft : activeWorkoutAiDraft;
+    if (!draft) return;
+    try {
+      setIsApprovingAiDraft(true);
+      setError("");
+      const savedDraft = await handleSaveAiDraft(planKind);
+      if (!savedDraft) return;
+      const approval = await approvePlanDraft(savedDraft.id);
+      upsertAiDraft(planKind, approval.draft);
+      if (planKind === "nutrition") {
+        setNutritionPlans((current) => [approval.plan, ...current]);
+      } else {
+        setWorkoutPlans((current) => [approval.plan, ...current]);
+      }
+      setDrawer(null);
+      setSuccessMessage("AI draft approved and saved as a final plan.");
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Failed to approve AI draft.");
+    } finally {
+      setIsApprovingAiDraft(false);
+    }
+  }
+
+  async function handleDiscardAiDraft(planKind: PlanKind) {
+    const draft = planKind === "nutrition" ? activeNutritionAiDraft : activeWorkoutAiDraft;
+    if (!draft) return;
+    try {
+      setIsDiscardingAiDraft(true);
+      setError("");
+      const discarded = await discardPlanDraft(draft.id);
+      upsertAiDraft(planKind, discarded);
+      setAiDraftEdit(planKind, initialPlanDraft());
+      setSuccessMessage("AI draft discarded.");
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Failed to discard AI draft.");
+    } finally {
+      setIsDiscardingAiDraft(false);
+    }
+  }
+
+  function upsertAiDraft(planKind: PlanKind, draft: PlanDraft) {
+    const setter = planKind === "nutrition" ? setNutritionAiDrafts : setWorkoutAiDrafts;
+    setter((current) => [draft, ...current.filter((item) => item.id !== draft.id)]);
+  }
+
+  function setAiDraftEdit(planKind: PlanKind, edit: PlanDraftState) {
+    if (planKind === "nutrition") {
+      setNutritionAiDraftEdit(edit);
+    } else {
+      setWorkoutAiDraftEdit(edit);
+    }
+  }
+
+  function setAiDraftForm(planKind: PlanKind, form: AiDraftFormState) {
+    if (planKind === "nutrition") {
+      setNutritionAiDraftForm(form);
+    } else {
+      setWorkoutAiDraftForm(form);
     }
   }
 
@@ -626,7 +803,9 @@ export default function ClientsPage({
                     helper="Meal structure, calorie targets, and nutrition coaching notes stay separate from training work."
                     plans={nutritionPlans}
                     latestPlan={nutritionPlans[0] ?? null}
+                    activeDraft={activeNutritionAiDraft}
                     onCreate={() => setDrawer("create-nutrition-plan")}
+                    onAiDraft={() => openAiDraftDrawer("nutrition")}
                     getPdfUrl={getNutritionPlanPdfUrl}
                   />
                 ) : null}
@@ -637,7 +816,9 @@ export default function ClientsPage({
                     helper="Training days, strength focus, and session structure are managed independently from nutrition."
                     plans={workoutPlans}
                     latestPlan={workoutPlans[0] ?? null}
+                    activeDraft={activeWorkoutAiDraft}
                     onCreate={() => setDrawer("create-workout-plan")}
+                    onAiDraft={() => openAiDraftDrawer("workout")}
                     getPdfUrl={getWorkoutPlanPdfUrl}
                   />
                 ) : null}
@@ -759,6 +940,46 @@ export default function ClientsPage({
         {drawer === "create-workout-plan" ? (
           <PlanForm title="Workout plan" draft={workoutDraft} isSaving={isSavingWorkout} onDraftChange={setWorkoutDraft} onSubmit={handleCreateWorkoutPlan} />
         ) : null}
+
+        {drawer === "ai-nutrition-draft" ? (
+          <AiPlanDraftForm
+            planKind="nutrition"
+            form={nutritionAiDraftForm}
+            edit={nutritionAiDraftEdit}
+            activeDraft={activeNutritionAiDraft}
+            isGenerating={isGeneratingAiDraft}
+            isSaving={isSavingAiDraft}
+            isApproving={isApprovingAiDraft}
+            isDiscarding={isDiscardingAiDraft}
+            onFormChange={setNutritionAiDraftForm}
+            onEditChange={setNutritionAiDraftEdit}
+            onGenerate={(event) => handleGenerateAiDraft("nutrition", event)}
+            onRegenerate={() => handleGenerateAiDraft("nutrition")}
+            onSave={() => handleSaveAiDraft("nutrition")}
+            onApprove={() => handleApproveAiDraft("nutrition")}
+            onDiscard={() => handleDiscardAiDraft("nutrition")}
+          />
+        ) : null}
+
+        {drawer === "ai-workout-draft" ? (
+          <AiPlanDraftForm
+            planKind="workout"
+            form={workoutAiDraftForm}
+            edit={workoutAiDraftEdit}
+            activeDraft={activeWorkoutAiDraft}
+            isGenerating={isGeneratingAiDraft}
+            isSaving={isSavingAiDraft}
+            isApproving={isApprovingAiDraft}
+            isDiscarding={isDiscardingAiDraft}
+            onFormChange={setWorkoutAiDraftForm}
+            onEditChange={setWorkoutAiDraftEdit}
+            onGenerate={(event) => handleGenerateAiDraft("workout", event)}
+            onRegenerate={() => handleGenerateAiDraft("workout")}
+            onSave={() => handleSaveAiDraft("workout")}
+            onApprove={() => handleApproveAiDraft("workout")}
+            onDiscard={() => handleDiscardAiDraft("workout")}
+          />
+        ) : null}
       </Drawer>
     </div>
   );
@@ -823,20 +1044,32 @@ function PlanTab({
   helper,
   plans,
   latestPlan,
+  activeDraft,
   onCreate,
+  onAiDraft,
   getPdfUrl,
 }: {
   typeLabel: "Nutrition" | "Workout";
   helper: string;
   plans: Plan[];
   latestPlan: Plan | null;
+  activeDraft: PlanDraft | null;
   onCreate: () => void;
+  onAiDraft: () => void;
   getPdfUrl: (planId: number) => string;
 }) {
   return (
     <>
       <div style={styles.panel}>
-        <SectionHeader icon={typeLabel === "Nutrition" ? Apple : Dumbbell} title={`${typeLabel} workspace`} meta={`${plans.length} ${plans.length === 1 ? "plan" : "plans"}`} actionLabel={`Create ${typeLabel.toLowerCase()} plan`} onAction={onCreate} />
+        <SectionHeader
+          icon={typeLabel === "Nutrition" ? Apple : Dumbbell}
+          title={`${typeLabel} workspace`}
+          meta={`${plans.length} ${plans.length === 1 ? "plan" : "plans"}`}
+          actions={[
+            { label: "AI Draft", icon: Sparkles, onAction: onAiDraft, title: "Create an AI-assisted draft for coach review" },
+            { label: `Create ${typeLabel.toLowerCase()} plan`, icon: Plus, onAction: onCreate },
+          ]}
+        />
         <p style={styles.panelText}>{helper}</p>
       </div>
 
@@ -844,6 +1077,7 @@ function PlanTab({
         <div style={styles.panel}>
           <SectionHeader icon={FileText} title="Latest plan snapshot" />
           {latestPlan ? <PlanHistoryCard plan={latestPlan} getPdfUrl={getPdfUrl} /> : <EmptyState title={`No ${typeLabel.toLowerCase()} plan yet`} text={`Create the first ${typeLabel.toLowerCase()} plan for this client.`} />}
+          {activeDraft ? <PlanDraftCard draft={activeDraft} onOpen={onAiDraft} /> : null}
         </div>
         <div style={styles.panel}>
           <SectionHeader icon={ClipboardList} title="Plan history" />
@@ -1093,6 +1327,99 @@ function PlanForm({
   );
 }
 
+function AiPlanDraftForm({
+  planKind,
+  form,
+  edit,
+  activeDraft,
+  isGenerating,
+  isSaving,
+  isApproving,
+  isDiscarding,
+  onFormChange,
+  onEditChange,
+  onGenerate,
+  onRegenerate,
+  onSave,
+  onApprove,
+  onDiscard,
+}: {
+  planKind: PlanKind;
+  form: AiDraftFormState;
+  edit: PlanDraftState;
+  activeDraft: PlanDraft | null;
+  isGenerating: boolean;
+  isSaving: boolean;
+  isApproving: boolean;
+  isDiscarding: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<AiDraftFormState>>;
+  onEditChange: React.Dispatch<React.SetStateAction<PlanDraftState>>;
+  onGenerate: (e: React.FormEvent<HTMLFormElement>) => void;
+  onRegenerate: () => void;
+  onSave: () => void;
+  onApprove: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <form onSubmit={onGenerate} style={styles.form}>
+      <div style={styles.noticeBox}>
+        <strong>AI draft</strong>
+        <span>Review before approving. Coach approval required before this becomes a final plan.</span>
+      </div>
+      <SectionEyebrow title="Generation inputs" />
+      <LabeledField label="Period type">
+        <select value={form.period_type} onChange={(e) => onFormChange((current) => ({ ...current, period_type: e.target.value as PlanPeriodType }))} style={styles.input}>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </LabeledField>
+      <LabeledField label="Period start"><input type="date" value={form.period_start} onChange={(e) => onFormChange((current) => ({ ...current, period_start: e.target.value }))} style={styles.input} required /></LabeledField>
+      <LabeledField label="Period end"><input type="date" value={form.period_end} onChange={(e) => onFormChange((current) => ({ ...current, period_end: e.target.value }))} style={styles.input} required /></LabeledField>
+      {planKind === "nutrition" ? (
+        <LabeledField label="Dietary preference">
+          <select value={form.dietary_preference} onChange={(e) => onFormChange((current) => ({ ...current, dietary_preference: e.target.value as DietaryPreference }))} style={styles.input}>
+            <option value="no_preference">No preference</option>
+            <option value="vegetarian">Vegetarian</option>
+            <option value="non_vegetarian">Non vegetarian</option>
+            <option value="eggetarian">Eggetarian</option>
+            <option value="vegan">Vegan</option>
+          </select>
+        </LabeledField>
+      ) : null}
+      <LabeledField label="Coach instructions"><textarea value={form.coach_prompt} onChange={(e) => onFormChange((current) => ({ ...current, coach_prompt: e.target.value }))} style={styles.textarea} placeholder="Optional guidance for this draft" /></LabeledField>
+
+      {!activeDraft ? (
+        <button type="submit" style={styles.secondaryButton} disabled={isGenerating}><Sparkles size={16} />{isGenerating ? "Generating..." : "Generate AI draft"}</button>
+      ) : (
+        <>
+          <SectionEyebrow title="Editable draft" />
+          <LabeledField label="Draft title"><input value={edit.title} onChange={(e) => onEditChange((current) => ({ ...current, title: e.target.value }))} style={styles.input} required /></LabeledField>
+          <LabeledField label="Primary focus"><input value={edit.focus} onChange={(e) => onEditChange((current) => ({ ...current, focus: e.target.value }))} style={styles.input} /></LabeledField>
+          <LabeledField label="Summary"><textarea value={edit.summary} onChange={(e) => onEditChange((current) => ({ ...current, summary: e.target.value }))} style={styles.textarea} /></LabeledField>
+          {planKind === "nutrition" ? (
+            <LabeledField label="Meals or daily structure"><textarea value={edit.meals} onChange={(e) => onEditChange((current) => ({ ...current, meals: e.target.value }))} style={styles.textarea} /></LabeledField>
+          ) : (
+            <>
+              <LabeledField label="Training split or workout days"><textarea value={edit.workout_days} onChange={(e) => onEditChange((current) => ({ ...current, workout_days: e.target.value }))} style={styles.textarea} /></LabeledField>
+              <LabeledField label="Mobility drills"><textarea value={edit.mobility_drills} onChange={(e) => onEditChange((current) => ({ ...current, mobility_drills: e.target.value }))} style={styles.textarea} /></LabeledField>
+              <LabeledField label="Stretching plan"><textarea value={edit.stretching_plan} onChange={(e) => onEditChange((current) => ({ ...current, stretching_plan: e.target.value }))} style={styles.textarea} /></LabeledField>
+            </>
+          )}
+          <LabeledField label="Coach notes"><textarea value={edit.notes} onChange={(e) => onEditChange((current) => ({ ...current, notes: e.target.value }))} style={styles.textarea} /></LabeledField>
+          <div style={styles.actionRow}>
+            <button type="button" style={styles.secondaryButton} onClick={onRegenerate} disabled={isGenerating}><RefreshCw size={16} />{isGenerating ? "Regenerating..." : "Regenerate"}</button>
+            <button type="button" style={styles.secondaryButton} onClick={onSave} disabled={isSaving}><Save size={16} />{isSaving ? "Saving..." : "Save draft"}</button>
+          </div>
+          <div style={styles.actionRow}>
+            <button type="button" style={styles.secondaryButton} onClick={onDiscard} disabled={isDiscarding}>{isDiscarding ? "Discarding..." : "Discard"}</button>
+            <button type="button" style={styles.primaryButton} onClick={onApprove} disabled={isApproving}><Sparkles size={16} />{isApproving ? "Approving..." : "Approve as plan"}</button>
+          </div>
+        </>
+      )}
+    </form>
+  );
+}
+
 function Drawer({ title, isOpen, onClose, children }: { title: string; isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
   if (!isOpen) return null;
   return (
@@ -1108,7 +1435,29 @@ function Drawer({ title, isOpen, onClose, children }: { title: string; isOpen: b
   );
 }
 
-function SectionHeader({ icon: Icon, title, meta, actionLabel, onAction }: { icon?: LucideIcon; title: string; meta?: string; actionLabel?: string; onAction?: () => void }) {
+type SectionAction = {
+  label: string;
+  icon?: LucideIcon;
+  onAction: () => void;
+  title?: string;
+};
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  meta,
+  actionLabel,
+  onAction,
+  actions,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  meta?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  actions?: SectionAction[];
+}) {
+  const headerActions = actions ?? (actionLabel && onAction ? [{ label: actionLabel, onAction }] : []);
   return (
     <div style={styles.panelHeader}>
       <div style={styles.panelTitleWrap}>
@@ -1118,10 +1467,19 @@ function SectionHeader({ icon: Icon, title, meta, actionLabel, onAction }: { ico
           {meta ? <div style={styles.historyMeta}>{meta}</div> : null}
         </div>
       </div>
-      {actionLabel && onAction ? <button style={styles.secondaryButton} onClick={onAction}>
-        {actionLabel.includes("Refresh") ? <RefreshCw size={16} /> : <Plus size={16} />}
-        {actionLabel}
-      </button> : null}
+      {headerActions.length ? (
+        <div style={styles.headerButtonGroup}>
+          {headerActions.map((action) => {
+            const ActionIcon = action.icon ?? (action.label.includes("Refresh") ? RefreshCw : Plus);
+            return (
+              <button key={action.label} type="button" style={styles.secondaryButton} onClick={action.onAction} title={action.title}>
+                <ActionIcon size={16} />
+                {action.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1202,6 +1560,21 @@ function PlanHistoryCard({ plan, getPdfUrl }: { plan: Plan; getPdfUrl: (planId: 
   );
 }
 
+function PlanDraftCard({ draft, onOpen }: { draft: PlanDraft; onOpen: () => void }) {
+  return (
+    <button type="button" style={styles.draftCardButton} onClick={onOpen}>
+      <div style={styles.historyTopRow}>
+        <div>
+          <div style={styles.historyTitle}>AI draft: {draft.title}</div>
+          <div style={styles.historyMeta}>Review before approving · {draft.period_start} to {draft.period_end}</div>
+        </div>
+        <span style={styles.statusBadge}>Coach approval required</span>
+      </div>
+      <div style={styles.historySummary}>{draft.content.summary || draft.content.focus || "AI draft ready for coach review."}</div>
+    </button>
+  );
+}
+
 function renderDetailTab(
   tab: DetailTab,
   label: string,
@@ -1228,8 +1601,40 @@ function buildPlanPayload(draft: PlanDraftState): PlanPayload {
       focus: draft.focus,
       meals: draft.meals,
       workout_days: draft.workout_days,
+      mobility_drills: draft.mobility_drills,
+      stretching_plan: draft.stretching_plan,
       notes: draft.notes,
     },
+  };
+}
+
+function getActiveAiDraft(drafts: PlanDraft[]) {
+  return drafts.find((draft) => draft.status === "draft") ?? null;
+}
+
+function planDraftToEditState(draft: PlanDraft): PlanDraftState {
+  return {
+    title: draft.title,
+    period_type: draft.period_type,
+    period_start: draft.period_start,
+    period_end: draft.period_end,
+    summary: draft.content.summary ?? "",
+    focus: draft.content.focus ?? "",
+    meals: draft.content.meals ?? "",
+    workout_days: draft.content.workout_days ?? "",
+    mobility_drills: draft.content.mobility_drills ?? "",
+    stretching_plan: draft.content.stretching_plan ?? "",
+    notes: draft.content.notes ?? "",
+  };
+}
+
+function aiFormFromDraft(draft: PlanDraft): AiDraftFormState {
+  return {
+    period_type: draft.period_type,
+    period_start: draft.period_start,
+    period_end: draft.period_end,
+    dietary_preference: (draft.generation_preferences.dietary_preference as DietaryPreference | undefined) ?? "no_preference",
+    coach_prompt: draft.coach_prompt ?? "",
   };
 }
 
@@ -1241,6 +1646,8 @@ function getDrawerTitle(drawer: DrawerName) {
     case "add-progress-photo": return "Add progress photo";
     case "create-nutrition-plan": return "Create nutrition plan";
     case "create-workout-plan": return "Create workout plan";
+    case "ai-nutrition-draft": return "AI nutrition draft";
+    case "ai-workout-draft": return "AI workout draft";
     default: return "";
   }
 }
@@ -1343,6 +1750,7 @@ const styles: Record<string, React.CSSProperties> = {
   workspace: { display: "flex", flexDirection: "column", gap: 20 },
   panel: { backgroundColor: "rgba(255,255,255,0.88)", border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.panel, padding: 20, boxShadow: THEME.shadows.card },
   panelHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, marginBottom: 16 },
+  headerButtonGroup: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 },
   panelTitle: { fontSize: 18, fontWeight: 800, color: THEME.colors.text },
   panelTitleWrap: { display: "flex", alignItems: "center", gap: 10 },
   panelIcon: { width: 34, height: 34, borderRadius: THEME.radii.md, backgroundColor: THEME.colors.accentMuted, color: THEME.colors.accentDeep, display: "flex", alignItems: "center", justifyContent: "center" },
@@ -1376,6 +1784,7 @@ const styles: Record<string, React.CSSProperties> = {
   progressBody: { padding: 14 },
   historyList: { display: "flex", flexDirection: "column", gap: 12 },
   historyCard: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted },
+  draftCardButton: { width: "100%", marginTop: 12, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },
   historyButton: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted, textAlign: "left", cursor: "pointer" },
   historyButtonActive: { borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },
   historyTopRow: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" },
@@ -1390,6 +1799,7 @@ const styles: Record<string, React.CSSProperties> = {
   textarea: { minHeight: 92, padding: "10px 12px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
   textareaLarge: { minHeight: 150, padding: "10px 12px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
   form: { display: "flex", flexDirection: "column", gap: 14 },
+  noticeBox: { display: "flex", flexDirection: "column", gap: 4, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.primaryMuted, color: THEME.colors.primaryDeep, padding: 14, lineHeight: 1.5 },
   checkboxRow: { display: "flex", alignItems: "center", gap: 8, color: THEME.colors.textSoft, fontWeight: 700 },
   sectionEyebrow: { marginTop: 4, paddingTop: 4, color: THEME.colors.primary, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0 },
   drawerBackdrop: { position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.32)", display: "flex", justifyContent: "flex-end", zIndex: 20 },

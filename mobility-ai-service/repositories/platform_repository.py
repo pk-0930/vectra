@@ -140,6 +140,29 @@ class PostgresPlatformRepository:
                 )
                 cursor.execute(
                     """
+                    CREATE TABLE IF NOT EXISTS ai_plan_drafts (
+                        id BIGSERIAL PRIMARY KEY,
+                        client_id BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        coach_id BIGINT NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+                        plan_kind TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        period_type TEXT NOT NULL,
+                        period_start DATE NOT NULL,
+                        period_end DATE NOT NULL,
+                        title TEXT NOT NULL,
+                        content_json JSONB NOT NULL,
+                        source_context_json JSONB NOT NULL,
+                        generation_preferences_json JSONB NOT NULL,
+                        coach_prompt TEXT NULL,
+                        model_name TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL,
+                        approved_plan_id BIGINT NULL
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS form_analyses (
                         id TEXT PRIMARY KEY,
                         client_id BIGINT NULL REFERENCES clients(id) ON DELETE SET NULL,
@@ -548,6 +571,141 @@ class PostgresPlatformRepository:
                     RETURNING *
                     """,
                     (pdf_blob_name, plan_id),
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        return row
+
+    def create_plan_draft(self, payload: dict) -> dict:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO ai_plan_drafts (
+                        client_id,
+                        coach_id,
+                        plan_kind,
+                        status,
+                        period_type,
+                        period_start,
+                        period_end,
+                        title,
+                        content_json,
+                        source_context_json,
+                        generation_preferences_json,
+                        coach_prompt,
+                        model_name,
+                        created_at,
+                        updated_at,
+                        approved_plan_id
+                    )
+                    VALUES (
+                        %(client_id)s,
+                        %(coach_id)s,
+                        %(plan_kind)s,
+                        %(status)s,
+                        %(period_type)s,
+                        %(period_start)s,
+                        %(period_end)s,
+                        %(title)s,
+                        %(content_json)s::jsonb,
+                        %(source_context_json)s::jsonb,
+                        %(generation_preferences_json)s::jsonb,
+                        %(coach_prompt)s,
+                        %(model_name)s,
+                        %(created_at)s,
+                        %(updated_at)s,
+                        %(approved_plan_id)s
+                    )
+                    RETURNING *
+                    """,
+                    payload,
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        return row
+
+    def list_plan_drafts(
+        self,
+        client_id: int,
+        coach_id: int,
+        plan_kind: str | None = None,
+    ) -> list[dict]:
+        query = """
+            SELECT *
+            FROM ai_plan_drafts
+            WHERE client_id = %(client_id)s AND coach_id = %(coach_id)s
+        """
+        params = {"client_id": client_id, "coach_id": coach_id}
+        if plan_kind is not None:
+            query += " AND plan_kind = %(plan_kind)s"
+            params["plan_kind"] = plan_kind
+        query += " ORDER BY updated_at DESC, created_at DESC"
+
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                return cursor.fetchall()
+
+    def fetch_plan_draft(self, draft_id: int, coach_id: int) -> dict | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT *
+                    FROM ai_plan_drafts
+                    WHERE id = %s AND coach_id = %s
+                    """,
+                    (draft_id, coach_id),
+                )
+                return cursor.fetchone()
+
+    def update_plan_draft(self, draft_id: int, coach_id: int, payload: dict) -> dict | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ai_plan_drafts
+                    SET period_type = %(period_type)s,
+                        period_start = %(period_start)s,
+                        period_end = %(period_end)s,
+                        title = %(title)s,
+                        content_json = %(content_json)s::jsonb,
+                        coach_prompt = %(coach_prompt)s,
+                        updated_at = %(updated_at)s
+                    WHERE id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
+                    RETURNING *
+                    """,
+                    {
+                        **payload,
+                        "id": draft_id,
+                        "coach_id": coach_id,
+                    },
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        return row
+
+    def set_plan_draft_status(
+        self,
+        draft_id: int,
+        coach_id: int,
+        status: str,
+        updated_at: datetime,
+        approved_plan_id: int | None,
+    ) -> dict | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ai_plan_drafts
+                    SET status = %s,
+                        updated_at = %s,
+                        approved_plan_id = %s
+                    WHERE id = %s AND coach_id = %s
+                    RETURNING *
+                    """,
+                    (status, updated_at, approved_plan_id, draft_id, coach_id),
                 )
                 row = cursor.fetchone()
             connection.commit()

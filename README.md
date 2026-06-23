@@ -460,3 +460,5 @@ Behavior:
 - Client-specific form analysis is the primary analysis workflow; `Recent Analysis` is secondary cross-client browsing.
 - Dashboard is intentionally KPI/navigation-only.
 - Async processing remains queue-driven and does not rely on DB polling or Azure Functions.
+#   V e c t r a - - - C o a c h - M a n a g e m e n t - S y s t e m  
+ 

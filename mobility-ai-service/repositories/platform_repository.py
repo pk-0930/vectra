@@ -686,6 +686,35 @@ class PostgresPlatformRepository:
             connection.commit()
         return row
 
+    def regenerate_plan_draft(self, draft_id: int, coach_id: int, payload: dict) -> dict | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE ai_plan_drafts
+                    SET period_type = %(period_type)s,
+                        period_start = %(period_start)s,
+                        period_end = %(period_end)s,
+                        title = %(title)s,
+                        content_json = %(content_json)s::jsonb,
+                        source_context_json = %(source_context_json)s::jsonb,
+                        generation_preferences_json = %(generation_preferences_json)s::jsonb,
+                        coach_prompt = %(coach_prompt)s,
+                        model_name = %(model_name)s,
+                        updated_at = %(updated_at)s
+                    WHERE id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
+                    RETURNING *
+                    """,
+                    {
+                        **payload,
+                        "id": draft_id,
+                        "coach_id": coach_id,
+                    },
+                )
+                row = cursor.fetchone()
+            connection.commit()
+        return row
+
     def set_plan_draft_status(
         self,
         draft_id: int,

@@ -5,6 +5,7 @@ import type {
   PlanDraft,
   PlanDraftApproval,
   PlanDraftCreatePayload,
+  PlanDraftRegeneratePayload,
   PlanDraftUpdatePayload,
   PlanKind,
   PlanPayload,
@@ -89,6 +90,18 @@ export async function updatePlanDraft(draftId: number, payload: PlanDraftUpdateP
   });
 
   return readJsonOrThrow<PlanDraft>(response, "Failed to update AI draft");
+}
+
+export async function regeneratePlanDraft(draftId: number, payload: PlanDraftRegeneratePayload): Promise<PlanDraft> {
+  const response = await fetch(`${API_BASE_URL}/plan-drafts/${draftId}/regenerate`, {
+    method: "POST",
+    headers: buildAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(payload),
+  });
+
+  return readJsonOrThrow<PlanDraft>(response, "Failed to regenerate AI draft");
 }
 
 export async function approvePlanDraft(draftId: number): Promise<PlanDraftApproval> {

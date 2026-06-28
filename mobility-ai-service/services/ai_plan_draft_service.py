@@ -4,85 +4,12 @@ from typing import Any
 
 from config.postgres_config import get_postgres_config
 from repositories.platform_repository import PostgresPlatformRepository
+from services.ai_plan_generation_service import build_default_plan_draft_generator
 from services.plan_service import PlanService
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-class MockPlanDraftGenerator:
-    def generate(self, plan_kind: str, request: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-        client = context["client"]
-        goal = client.get("current_goal_type")
-        goal_text = goal.replace("_", " ") if goal else "general fitness"
-        coach_prompt = request.get("coach_prompt") or "No extra coach instructions."
-        title = f"AI draft {plan_kind} plan for {client['first_name']}"
-
-        if plan_kind == "nutrition":
-            dietary_preference = request["generation_preferences"].get("dietary_preference", "no_preference")
-            content = {
-                "summary": (
-                    f"Draft nutrition structure for {client['first_name']} focused on {goal_text}. "
-                    "Coach approval required before sharing."
-                ),
-                "focus": f"Support {goal_text} with consistent meals, hydration, and protein distribution.",
-                "meals": self._nutrition_meals(dietary_preference),
-                "notes": f"Dietary preference: {dietary_preference.replace('_', ' ')}. Coach instruction: {coach_prompt}",
-            }
-        else:
-            analysis_note = self._analysis_note(context.get("latest_form_analysis"))
-            content = {
-                "summary": (
-                    f"Draft workout structure for {client['first_name']} focused on {goal_text}. "
-                    "Review movement readiness before approval."
-                ),
-                "focus": f"Build training consistency while addressing form-analysis context. {analysis_note}",
-                "workout_days": (
-                    "Day 1: lower-body strength with squat pattern practice.\n"
-                    "Day 2: upper-body push/pull and trunk stability.\n"
-                    "Day 3: full-body conditioning with controlled tempo work."
-                ),
-                "mobility_drills": (
-                    "Before workout: 6-8 minutes of ankle rocks, hip flexor mobilization, and thoracic rotations.\n"
-                    "Between warm-up and main sets: 2 light technique sets using the day's main pattern.\n"
-                    "Recovery day: 10 minutes of easy hips, ankles, and breathing-based mobility."
-                ),
-                "stretching_plan": (
-                    "After workout: 5-7 minutes of calf, hip flexor, hamstring, and chest stretches.\n"
-                    "Hold each stretch for 30-45 seconds without forcing range."
-                ),
-                "notes": f"Coach instruction: {coach_prompt}",
-            }
-
-        return {
-            "title": title,
-            "content": content,
-        }
-
-    def _nutrition_meals(self, dietary_preference: str) -> str:
-        protein_examples = {
-            "vegetarian": "paneer, curd, dal, sprouts, tofu",
-            "non_vegetarian": "eggs, chicken, fish, curd, dal",
-            "eggetarian": "eggs, curd, dal, paneer, sprouts",
-            "vegan": "tofu, tempeh, dal, beans, sprouts",
-            "no_preference": "eggs, curd, dal, paneer, chicken, tofu",
-        }
-        proteins = protein_examples.get(dietary_preference, protein_examples["no_preference"])
-        return (
-            f"Breakfast: balanced meal with one protein source such as {proteins}.\n"
-            "Lunch: whole-grain or rice base, vegetables, and a palm-sized protein serving.\n"
-            "Snack: fruit plus a protein or fiber-rich option.\n"
-            "Dinner: lighter plate with vegetables, protein, and hydration check."
-        )
-
-    def _analysis_note(self, latest_form_analysis: dict[str, Any] | None) -> str:
-        if latest_form_analysis is None:
-            return "No completed form analysis was available, so mobility work is conservative."
-        feedback = latest_form_analysis.get("coach_feedback_note")
-        if feedback:
-            return f"Latest coach feedback noted: {feedback}"
-        return "Latest completed form analysis is available for coach review."
 
 
 class AiPlanDraftService:
@@ -95,7 +22,7 @@ class AiPlanDraftService:
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
         self.repository.initialize()
         self.plan_service = plan_service or PlanService(repository=self.repository)
-        self.generator = generator or MockPlanDraftGenerator()
+        self.generator = generator or build_default_plan_draft_generator()
 
     def create_draft(self, coach_id: int, client_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         plan_kind = self._validate_kind(payload["plan_kind"])
@@ -104,10 +31,7 @@ class AiPlanDraftService:
             raise ValueError("Client not found.")
 
         preferences = self._build_generation_preferences(plan_kind, payload)
-        request = {
-            **payload,
-            "generation_preferences": preferences,
-        }
+        request = self._build_generation_request(plan_kind, payload, preferences)
         source_context = self._build_source_context(plan_kind, client_id, coach_id, client)
         generated = self.generator.generate(plan_kind, request, source_context)
 
@@ -126,13 +50,57 @@ class AiPlanDraftService:
                 "source_context_json": json.dumps(source_context),
                 "generation_preferences_json": json.dumps(preferences),
                 "coach_prompt": payload.get("coach_prompt"),
-                "model_name": "deterministic_mock_v1",
+                "model_name": self.generator.model_name,
                 "created_at": timestamp,
                 "updated_at": timestamp,
                 "approved_plan_id": None,
             }
         )
         return self._serialize_draft(row)
+
+    def regenerate_draft(self, coach_id: int, draft_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
+        draft = self.repository.fetch_plan_draft(draft_id, coach_id)
+        if draft is None:
+            return None
+        if draft["status"] != self.DRAFT_STATUS:
+            raise ValueError("Only draft plans can be regenerated.")
+
+        plan_kind = self._validate_kind(draft["plan_kind"])
+        client_id = draft["client_id"]
+        client = self.repository.fetch_client(client_id, coach_id)
+        if client is None:
+            raise ValueError("Client not found.")
+
+        generation_payload = {
+            "plan_kind": plan_kind,
+            "period_type": payload["period_type"],
+            "period_start": payload["period_start"],
+            "period_end": payload["period_end"],
+            "dietary_preference": payload.get("dietary_preference"),
+            "coach_prompt": payload.get("coach_prompt"),
+        }
+        preferences = self._build_generation_preferences(plan_kind, generation_payload)
+        request = self._build_generation_request(plan_kind, generation_payload, preferences)
+        source_context = self._build_source_context(plan_kind, client_id, coach_id, client)
+        generated = self.generator.generate(plan_kind, request, source_context)
+
+        row = self.repository.regenerate_plan_draft(
+            draft_id,
+            coach_id,
+            {
+                "period_type": generation_payload["period_type"],
+                "period_start": generation_payload["period_start"],
+                "period_end": generation_payload["period_end"],
+                "title": generated["title"].strip(),
+                "content_json": json.dumps(generated["content"]),
+                "source_context_json": json.dumps(source_context),
+                "generation_preferences_json": json.dumps(preferences),
+                "coach_prompt": generation_payload.get("coach_prompt"),
+                "model_name": self.generator.model_name,
+                "updated_at": utc_now(),
+            },
+        )
+        return self._serialize_draft(row) if row else None
 
     def list_drafts(self, coach_id: int, client_id: int, plan_kind: str | None = None) -> list[dict[str, Any]]:
         client = self.repository.fetch_client(client_id, coach_id)
@@ -250,6 +218,24 @@ class AiPlanDraftService:
         if plan_kind != "nutrition":
             return {}
         return {"dietary_preference": payload.get("dietary_preference") or "no_preference"}
+
+    def _build_generation_request(
+        self,
+        plan_kind: str,
+        payload: dict[str, Any],
+        preferences: dict[str, Any],
+    ) -> dict[str, Any]:
+        request = {
+            "plan_kind": plan_kind,
+            "period_type": payload["period_type"],
+            "period_start": payload["period_start"],
+            "period_end": payload["period_end"],
+            "coach_prompt": payload.get("coach_prompt"),
+            "generation_preferences": preferences,
+        }
+        if plan_kind == "nutrition":
+            request["dietary_preference"] = preferences["dietary_preference"]
+        return request
 
     def _validate_kind(self, plan_kind: str) -> str:
         if plan_kind not in self.VALID_KINDS:

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from config.local_settings_loader import load_local_settings
 from services.auth_service import AuthService
+from services.ai_plan_generation_service import PlanDraftGenerationError
 from services.ai_plan_draft_service import AiPlanDraftService
 from services.blob_storage_service import BlobStorageService
 from services.client_service import ClientService
@@ -178,6 +179,14 @@ class PlanDraftUpdatePayload(BaseModel):
     period_end: str
     title: str
     content: dict[str, Any]
+    coach_prompt: str | None = None
+
+
+class PlanDraftRegeneratePayload(BaseModel):
+    period_type: str
+    period_start: str
+    period_end: str
+    dietary_preference: str | None = None
     coach_prompt: str | None = None
 
 
@@ -482,6 +491,8 @@ async def create_plan_draft(
 ):
     try:
         return ai_plan_draft_service.create_draft(coach["id"], client_id, payload.model_dump())
+    except PlanDraftGenerationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         status_code = 400 if "Unsupported" in str(exc) else 404
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
@@ -518,6 +529,24 @@ async def update_plan_draft(
         draft = ai_plan_draft_service.update_draft(coach["id"], draft_id, payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Plan draft not found.")
+    return draft
+
+
+@app.post("/plan-drafts/{draft_id}/regenerate", response_model=PlanDraftResponse)
+async def regenerate_plan_draft(
+    draft_id: int,
+    payload: PlanDraftRegeneratePayload,
+    coach: dict = Depends(get_current_coach),
+):
+    try:
+        draft = ai_plan_draft_service.regenerate_draft(coach["id"], draft_id, payload.model_dump())
+    except PlanDraftGenerationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        status_code = 400 if "Unsupported" in str(exc) or "Only draft" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     if draft is None:
         raise HTTPException(status_code=404, detail="Plan draft not found.")
     return draft

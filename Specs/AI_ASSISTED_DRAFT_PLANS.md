@@ -392,12 +392,35 @@ Build this in three slices:
 - frontend draft UI
 - deterministic mock draft generator
 
+#### Enhancement 1
+
+The AI generated draft plan appears in the UI's Latest plan snapshot list, but we are unable to open the approved plan in the UI unlike we do for the approval required plans. The approved plan provides the PDF option to download but it should also provide option to open up the plan in the UI.
+
+Acceptance Criteria:
+- Coach approved plans must be clicked to open in the UI similar to approval required plans.
+- No actions can be done on those approved plans when the UI shows up the plan details
+- All the fields of that approved plan must be non editable.
+- We can reuse the already existing UI where we provide inputs for the draft plans.
+- Do not shows texts that says draft, the title says Approved Plan details. Like replace all the draft text/label to Approved Plan.
+
+
 ### Slice 2: AI generation
 
 - add Azure OpenAI service
 - replace mock generator
 - add prompt/context handling
 - add response validation
+
+Things to consider,
+- The configuration key value pairs like 'AZURE_OPENAI_ENDPOINT' and related can be placed in local.settings.json for local development
+- For production, the configuration values will be coming from the Azure resource's environment variables (similar to how other configurations are working like blob, postgres, queue)
+- The config values will be provided later so as of now just provide placeholders for those configuration values in local.settings.json.
+
+Technical considerations,
+- Follow SOLID principles
+- No hard coding
+- Maintain reusability
+- No boiler plate code
 
 ### Slice 3: Progress photo vision context
 

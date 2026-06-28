@@ -2,6 +2,13 @@ from datetime import UTC, date, datetime
 import json
 import unittest
 
+from services.ai_plan_generation_service import (
+    AzureOpenAIPlanDraftGenerator,
+    DeterministicPlanDraftGenerator,
+    PlanDraftGenerationError,
+    normalize_generated_plan,
+)
+from config.azure_openai_config import AzureOpenAIConfig
 from services.ai_plan_draft_service import AiPlanDraftService
 from services.plan_service import PlanService
 
@@ -123,6 +130,15 @@ class InMemoryPlanDraftRepository:
         draft["period_end"] = date.fromisoformat(payload["period_end"])
         return dict(draft)
 
+    def regenerate_plan_draft(self, draft_id: int, coach_id: int, payload: dict) -> dict | None:
+        draft = self.drafts.get(draft_id)
+        if draft is None or draft["coach_id"] != coach_id or draft["status"] != "draft":
+            return None
+        draft.update(payload)
+        draft["period_start"] = date.fromisoformat(payload["period_start"])
+        draft["period_end"] = date.fromisoformat(payload["period_end"])
+        return dict(draft)
+
     def set_plan_draft_status(
         self,
         draft_id: int,
@@ -164,6 +180,7 @@ class AiPlanDraftServiceTests(unittest.TestCase):
 
         self.assertEqual(draft["status"], "draft")
         self.assertEqual(draft["generation_preferences"]["dietary_preference"], "vegetarian")
+        self.assertEqual(draft["model_name"], DeterministicPlanDraftGenerator.model_name)
         self.assertIn("vegetarian", draft["content"]["notes"])
         self.assertEqual(draft["source_context"]["client"]["current_goal_type"], "strength_training")
 
@@ -185,6 +202,65 @@ class AiPlanDraftServiceTests(unittest.TestCase):
         self.assertIn("Before workout", draft["content"]["mobility_drills"])
         self.assertIn("After workout", draft["content"]["stretching_plan"])
         self.assertIn("Add ankle mobility", draft["content"]["focus"])
+
+    def test_regenerate_draft_reuses_same_review_record_with_current_inputs(self):
+        service = self.build_service()
+        draft = service.create_draft(
+            7,
+            1,
+            {
+                "plan_kind": "nutrition",
+                "period_type": "weekly",
+                "period_start": "2026-05-22",
+                "period_end": "2026-05-28",
+                "dietary_preference": "vegetarian",
+                "coach_prompt": "Keep meals simple.",
+            },
+        )
+
+        regenerated = service.regenerate_draft(
+            7,
+            draft["id"],
+            {
+                "period_type": "monthly",
+                "period_start": "2026-06-01",
+                "period_end": "2026-06-30",
+                "dietary_preference": "vegan",
+                "coach_prompt": "Use plant proteins.",
+            },
+        )
+
+        self.assertEqual(regenerated["id"], draft["id"])
+        self.assertEqual(regenerated["status"], "draft")
+        self.assertEqual(regenerated["period_type"], "monthly")
+        self.assertEqual(regenerated["generation_preferences"]["dietary_preference"], "vegan")
+        self.assertIn("vegan", regenerated["content"]["notes"])
+        self.assertEqual(regenerated["coach_prompt"], "Use plant proteins.")
+
+    def test_approved_draft_cannot_be_regenerated(self):
+        service = self.build_service()
+        draft = service.create_draft(
+            7,
+            1,
+            {
+                "plan_kind": "workout",
+                "period_type": "weekly",
+                "period_start": "2026-05-22",
+                "period_end": "2026-05-28",
+            },
+        )
+        service.approve_draft(7, draft["id"])
+
+        with self.assertRaises(ValueError):
+            service.regenerate_draft(
+                7,
+                draft["id"],
+                {
+                    "period_type": "weekly",
+                    "period_start": "2026-05-22",
+                    "period_end": "2026-05-28",
+                },
+            )
 
     def test_rejects_client_not_owned_by_coach(self):
         service = self.build_service()
@@ -238,6 +314,91 @@ class AiPlanDraftServiceTests(unittest.TestCase):
         self.assertEqual(discarded["status"], "discarded")
         with self.assertRaises(ValueError):
             service.approve_draft(7, draft["id"])
+
+    def test_normalizes_valid_ai_nutrition_response(self):
+        normalized = normalize_generated_plan(
+            "nutrition",
+            {
+                "title": " Simple nutrition week ",
+                "content": {
+                    "summary": " Summary ",
+                    "focus": " Focus ",
+                    "meals": " Meals ",
+                    "notes": " Notes ",
+                    "ignored": "not stored",
+                },
+            },
+        )
+
+        self.assertEqual(normalized["title"], "Simple nutrition week")
+        self.assertEqual(normalized["content"]["summary"], "Summary")
+        self.assertNotIn("ignored", normalized["content"])
+
+    def test_rejects_ai_workout_response_without_mobility(self):
+        with self.assertRaises(PlanDraftGenerationError):
+            normalize_generated_plan(
+                "workout",
+                {
+                    "title": "Workout week",
+                    "content": {
+                        "summary": "Summary",
+                        "focus": "Focus",
+                        "workout_days": "Days",
+                        "stretching_plan": "After workout: stretch.",
+                        "notes": "Notes",
+                    },
+                },
+            )
+
+    def test_azure_generator_normalizes_chat_completion_content(self):
+        class FakeAzureGenerator(AzureOpenAIPlanDraftGenerator):
+            def _post_chat_completion(self, payload: dict) -> dict:
+                self.last_payload = payload
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "title": "Workout draft",
+                                        "content": {
+                                            "summary": "Summary",
+                                            "focus": "Focus",
+                                            "workout_days": "Day 1: strength",
+                                            "mobility_drills": "Before workout: ankle rocks.",
+                                            "stretching_plan": "After workout: calf stretch.",
+                                            "notes": "Notes",
+                                        },
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+
+        generator = FakeAzureGenerator(
+            AzureOpenAIConfig(
+                endpoint="https://example.openai.azure.com",
+                api_key="key",
+                deployment="gpt-test",
+                api_version="2024-02-15-preview",
+            )
+        )
+
+        generated = generator.generate(
+            "workout",
+            {
+                "period_type": "weekly",
+                "period_start": "2026-05-22",
+                "period_end": "2026-05-28",
+                "generation_preferences": {},
+            },
+            {"client": {"first_name": "Asha"}, "latest_form_analysis": None},
+        )
+
+        self.assertEqual(generated["title"], "Workout draft")
+        self.assertIn("Before workout", generated["content"]["mobility_drills"])
+        self.assertEqual(generator.last_payload["response_format"]["type"], "json_object")
 
 
 if __name__ == "__main__":

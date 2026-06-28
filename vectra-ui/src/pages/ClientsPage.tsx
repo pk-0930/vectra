@@ -40,6 +40,7 @@ import {
   listPlanDrafts,
   listNutritionPlans,
   listWorkoutPlans,
+  regeneratePlanDraft,
   updatePlanDraft,
 } from "../services/planApi";
 import {
@@ -76,6 +77,7 @@ type DrawerName =
   | "create-workout-plan"
   | "ai-nutrition-draft"
   | "ai-workout-draft"
+  | "approved-plan-details"
   | null;
 
 type PlanDraftState = {
@@ -168,6 +170,7 @@ export default function ClientsPage({
   const [workoutAiDraftForm, setWorkoutAiDraftForm] = useState<AiDraftFormState>(initialAiDraftForm);
   const [nutritionAiDraftEdit, setNutritionAiDraftEdit] = useState<PlanDraftState>(initialPlanDraft);
   const [workoutAiDraftEdit, setWorkoutAiDraftEdit] = useState<PlanDraftState>(initialPlanDraft);
+  const [selectedApprovedPlan, setSelectedApprovedPlan] = useState<{ plan: Plan; planKind: PlanKind } | null>(null);
   const [progressPhotoFile, setProgressPhotoFile] = useState<File | null>(null);
   const [progressPhotoForm, setProgressPhotoForm] = useState({
     timeline_type: "weekly",
@@ -512,6 +515,11 @@ export default function ClientsPage({
     setDrawer(planKind === "nutrition" ? "ai-nutrition-draft" : "ai-workout-draft");
   }
 
+  function openApprovedPlanDetails(planKind: PlanKind, plan: Plan) {
+    setSelectedApprovedPlan({ plan, planKind });
+    setDrawer("approved-plan-details");
+  }
+
   async function handleGenerateAiDraft(planKind: PlanKind, e?: React.FormEvent<HTMLFormElement>) {
     e?.preventDefault();
     if (!selectedClient) return;
@@ -532,6 +540,31 @@ export default function ClientsPage({
       setSuccessMessage("AI draft generated. Review before approving.");
     } catch (draftError) {
       setError(draftError instanceof Error ? draftError.message : "Failed to generate AI draft.");
+    } finally {
+      setIsGeneratingAiDraft(false);
+    }
+  }
+
+  async function handleRegenerateAiDraft(planKind: PlanKind) {
+    const draft = planKind === "nutrition" ? activeNutritionAiDraft : activeWorkoutAiDraft;
+    if (!draft) return;
+    const form = planKind === "nutrition" ? nutritionAiDraftForm : workoutAiDraftForm;
+    try {
+      setIsGeneratingAiDraft(true);
+      setError("");
+      const regenerated = await regeneratePlanDraft(draft.id, {
+        period_type: form.period_type,
+        period_start: form.period_start,
+        period_end: form.period_end,
+        dietary_preference: planKind === "nutrition" ? form.dietary_preference : undefined,
+        coach_prompt: form.coach_prompt || undefined,
+      });
+      upsertAiDraft(planKind, regenerated);
+      setAiDraftForm(planKind, aiFormFromDraft(regenerated));
+      setAiDraftEdit(planKind, planDraftToEditState(regenerated));
+      setSuccessMessage("AI draft regenerated. Review before approving.");
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Failed to regenerate AI draft.");
     } finally {
       setIsGeneratingAiDraft(false);
     }
@@ -806,6 +839,7 @@ export default function ClientsPage({
                     activeDraft={activeNutritionAiDraft}
                     onCreate={() => setDrawer("create-nutrition-plan")}
                     onAiDraft={() => openAiDraftDrawer("nutrition")}
+                    onOpenPlan={(plan) => openApprovedPlanDetails("nutrition", plan)}
                     getPdfUrl={getNutritionPlanPdfUrl}
                   />
                 ) : null}
@@ -819,6 +853,7 @@ export default function ClientsPage({
                     activeDraft={activeWorkoutAiDraft}
                     onCreate={() => setDrawer("create-workout-plan")}
                     onAiDraft={() => openAiDraftDrawer("workout")}
+                    onOpenPlan={(plan) => openApprovedPlanDetails("workout", plan)}
                     getPdfUrl={getWorkoutPlanPdfUrl}
                   />
                 ) : null}
@@ -954,7 +989,7 @@ export default function ClientsPage({
             onFormChange={setNutritionAiDraftForm}
             onEditChange={setNutritionAiDraftEdit}
             onGenerate={(event) => handleGenerateAiDraft("nutrition", event)}
-            onRegenerate={() => handleGenerateAiDraft("nutrition")}
+            onRegenerate={() => handleRegenerateAiDraft("nutrition")}
             onSave={() => handleSaveAiDraft("nutrition")}
             onApprove={() => handleApproveAiDraft("nutrition")}
             onDiscard={() => handleDiscardAiDraft("nutrition")}
@@ -974,11 +1009,15 @@ export default function ClientsPage({
             onFormChange={setWorkoutAiDraftForm}
             onEditChange={setWorkoutAiDraftEdit}
             onGenerate={(event) => handleGenerateAiDraft("workout", event)}
-            onRegenerate={() => handleGenerateAiDraft("workout")}
+            onRegenerate={() => handleRegenerateAiDraft("workout")}
             onSave={() => handleSaveAiDraft("workout")}
             onApprove={() => handleApproveAiDraft("workout")}
             onDiscard={() => handleDiscardAiDraft("workout")}
           />
+        ) : null}
+
+        {drawer === "approved-plan-details" && selectedApprovedPlan ? (
+          <ApprovedPlanDetailsForm planKind={selectedApprovedPlan.planKind} plan={selectedApprovedPlan.plan} />
         ) : null}
       </Drawer>
     </div>
@@ -1047,6 +1086,7 @@ function PlanTab({
   activeDraft,
   onCreate,
   onAiDraft,
+  onOpenPlan,
   getPdfUrl,
 }: {
   typeLabel: "Nutrition" | "Workout";
@@ -1056,6 +1096,7 @@ function PlanTab({
   activeDraft: PlanDraft | null;
   onCreate: () => void;
   onAiDraft: () => void;
+  onOpenPlan: (plan: Plan) => void;
   getPdfUrl: (planId: number) => string;
 }) {
   return (
@@ -1076,14 +1117,14 @@ function PlanTab({
       <div style={styles.twoColumnGrid}>
         <div style={styles.panel}>
           <SectionHeader icon={FileText} title="Latest plan snapshot" />
-          {latestPlan ? <PlanHistoryCard plan={latestPlan} getPdfUrl={getPdfUrl} /> : <EmptyState title={`No ${typeLabel.toLowerCase()} plan yet`} text={`Create the first ${typeLabel.toLowerCase()} plan for this client.`} />}
+          {latestPlan ? <PlanHistoryCard plan={latestPlan} getPdfUrl={getPdfUrl} onOpen={onOpenPlan} /> : <EmptyState title={`No ${typeLabel.toLowerCase()} plan yet`} text={`Create the first ${typeLabel.toLowerCase()} plan for this client.`} />}
           {activeDraft ? <PlanDraftCard draft={activeDraft} onOpen={onAiDraft} /> : null}
         </div>
         <div style={styles.panel}>
           <SectionHeader icon={ClipboardList} title="Plan history" />
           {!plans.length ? <EmptyState title="History is empty" text="Saved plans will appear here with PDF export actions." /> : null}
           <div style={styles.historyList}>
-            {plans.map((plan) => <PlanHistoryCard key={plan.id} plan={plan} getPdfUrl={getPdfUrl} />)}
+            {plans.map((plan) => <PlanHistoryCard key={plan.id} plan={plan} getPdfUrl={getPdfUrl} onOpen={onOpenPlan} />)}
           </div>
         </div>
       </div>
@@ -1420,6 +1461,41 @@ function AiPlanDraftForm({
   );
 }
 
+function ApprovedPlanDetailsForm({ planKind, plan }: { planKind: PlanKind; plan: Plan }) {
+  const details = planToDraftState(plan);
+  return (
+    <div style={styles.form}>
+      <div style={styles.noticeBox}>
+        <strong>Approved plan</strong>
+        <span>This plan is final and view-only from this screen.</span>
+      </div>
+      <SectionEyebrow title="Plan window" />
+      <LabeledField label="Plan title"><input value={details.title} style={styles.input} disabled /></LabeledField>
+      <LabeledField label="Period type">
+        <select value={details.period_type} style={styles.input} disabled>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </LabeledField>
+      <LabeledField label="Period start"><input type="date" value={details.period_start} style={styles.input} disabled /></LabeledField>
+      <LabeledField label="Period end"><input type="date" value={details.period_end} style={styles.input} disabled /></LabeledField>
+      <SectionEyebrow title="Coaching content" />
+      <LabeledField label="Primary focus"><input value={details.focus} style={styles.input} disabled /></LabeledField>
+      <LabeledField label="Summary"><textarea value={details.summary} style={styles.textarea} readOnly /></LabeledField>
+      {planKind === "nutrition" ? (
+        <LabeledField label="Meals or daily structure"><textarea value={details.meals} style={styles.textarea} readOnly /></LabeledField>
+      ) : (
+        <>
+          <LabeledField label="Training split or workout days"><textarea value={details.workout_days} style={styles.textarea} readOnly /></LabeledField>
+          <LabeledField label="Mobility drills"><textarea value={details.mobility_drills} style={styles.textarea} readOnly /></LabeledField>
+          <LabeledField label="Stretching plan"><textarea value={details.stretching_plan} style={styles.textarea} readOnly /></LabeledField>
+        </>
+      )}
+      <LabeledField label="Coach notes"><textarea value={details.notes} style={styles.textarea} readOnly /></LabeledField>
+    </div>
+  );
+}
+
 function Drawer({ title, isOpen, onClose, children }: { title: string; isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
   if (!isOpen) return null;
   return (
@@ -1526,7 +1602,7 @@ function SectionEyebrow({ title }: { title: string }) {
   return <div style={styles.sectionEyebrow}>{title}</div>;
 }
 
-function PdfLink({ href, label }: { href: string; label: string }) {
+function PdfLink({ href, label, onClick }: { href: string; label: string; onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void }) {
   return (
     <a
       href={href}
@@ -1534,6 +1610,7 @@ function PdfLink({ href, label }: { href: string; label: string }) {
       rel="noreferrer"
       style={styles.linkButton}
       onClick={(event) => {
+        onClick?.(event);
         event.preventDefault();
         const token = getStoredAccessToken();
         window.open(`${href}?token=${encodeURIComponent(token)}`, "_blank", "noopener,noreferrer");
@@ -1545,15 +1622,26 @@ function PdfLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-function PlanHistoryCard({ plan, getPdfUrl }: { plan: Plan; getPdfUrl: (planId: number) => string }) {
+function PlanHistoryCard({ plan, getPdfUrl, onOpen }: { plan: Plan; getPdfUrl: (planId: number) => string; onOpen: (plan: Plan) => void }) {
   return (
-    <div style={styles.historyCard}>
+    <div
+      style={styles.historyCardButton}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(plan)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(plan);
+        }
+      }}
+    >
       <div style={styles.historyTopRow}>
         <div>
           <div style={styles.historyTitle}>{plan.title}</div>
           <div style={styles.historyMeta}>{plan.period_type} · {plan.period_start} to {plan.period_end}</div>
         </div>
-        <PdfLink href={getPdfUrl(plan.id)} label="PDF" />
+        <PdfLink href={getPdfUrl(plan.id)} label="PDF" onClick={(event) => event.stopPropagation()} />
       </div>
       <div style={styles.historySummary}>{plan.content.summary || plan.content.focus || "No summary added."}</div>
     </div>
@@ -1628,6 +1716,22 @@ function planDraftToEditState(draft: PlanDraft): PlanDraftState {
   };
 }
 
+function planToDraftState(plan: Plan): PlanDraftState {
+  return {
+    title: plan.title,
+    period_type: plan.period_type,
+    period_start: plan.period_start,
+    period_end: plan.period_end,
+    summary: plan.content.summary ?? "",
+    focus: plan.content.focus ?? "",
+    meals: plan.content.meals ?? "",
+    workout_days: plan.content.workout_days ?? "",
+    mobility_drills: plan.content.mobility_drills ?? "",
+    stretching_plan: plan.content.stretching_plan ?? "",
+    notes: plan.content.notes ?? "",
+  };
+}
+
 function aiFormFromDraft(draft: PlanDraft): AiDraftFormState {
   return {
     period_type: draft.period_type,
@@ -1648,6 +1752,7 @@ function getDrawerTitle(drawer: DrawerName) {
     case "create-workout-plan": return "Create workout plan";
     case "ai-nutrition-draft": return "AI nutrition draft";
     case "ai-workout-draft": return "AI workout draft";
+    case "approved-plan-details": return "Approved Plan details";
     default: return "";
   }
 }
@@ -1784,6 +1889,7 @@ const styles: Record<string, React.CSSProperties> = {
   progressBody: { padding: 14 },
   historyList: { display: "flex", flexDirection: "column", gap: 12 },
   historyCard: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted },
+  historyCardButton: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted, cursor: "pointer" },
   draftCardButton: { width: "100%", marginTop: 12, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },
   historyButton: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted, textAlign: "left", cursor: "pointer" },
   historyButtonActive: { borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },

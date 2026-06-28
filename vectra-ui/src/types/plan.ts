@@ -82,6 +82,14 @@ export type PlanDraftUpdatePayload = {
   coach_prompt?: string;
 };
 
+export type PlanDraftRegeneratePayload = {
+  period_type: PlanPeriodType;
+  period_start: string;
+  period_end: string;
+  dietary_preference?: DietaryPreference;
+  coach_prompt?: string;
+};
+
 export type PlanDraftApproval = {
   draft: PlanDraft;
   plan: Plan;

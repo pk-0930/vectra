@@ -17,7 +17,6 @@ class PlanService:
 
     def __init__(self, repository=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
-        self.repository.initialize()
 
     def create_plan(self, plan_kind: str, coach_id: int, client_id: int, payload: dict) -> dict:
         client = self.repository.fetch_client(client_id, coach_id)

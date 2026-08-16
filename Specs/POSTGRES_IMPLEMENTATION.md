@@ -4,11 +4,22 @@
 
 ### Current Implementation
 
-We are currently using sqllite for persistence which is not scalable and is not production ready. So, we are going to switch to Azure Database for PostgreSQL Flexible Server.
+The backend uses Azure Database for PostgreSQL Flexible Server through repository
+classes and `psycopg`. The current schema was historically created by idempotent
+`CREATE TABLE IF NOT EXISTS` statements in the repositories.
 
 ### After Implementation
 
-After this postgres implementation, the data that is getting persisted in sqllite will be going to be in postgres going forward. We are not migrating the data that is in sqllite to postgres.
+Flyway is the source of truth for PostgreSQL schema changes. The existing Azure
+database is adopted at baseline version 1, while new local databases create the
+current schema from `database/migrations/V1__baseline.sql`.
+
+The legacy `jobs` table remains in the baseline. Migration V2 moves any legacy
+rows into `form_analyses` using the same conflict-safe behavior previously run by
+the application at startup. PostgreSQL repositories no longer create or migrate
+tables during service initialization.
+
+SQLite data is not migrated to PostgreSQL.
 
 
 ## Postgres Details
@@ -19,7 +30,7 @@ Resource Group - "rg-vectra"
 Server Name - "psql-vectra"
 DB name - "Vectra"
 Administrator Login - "vectraadmin"
-Password - "admin@123"
+Password - configured outside the repository through deployment secrets
 Endpoint - "psql-vectra.postgres.database.azure.com"
 
 
@@ -37,6 +48,18 @@ Endpoint - "psql-vectra.postgres.database.azure.com"
     - `schemas/`: Contains Pydantic models for request and response validation.
 - Keep `app.py` thin
 
+### Flyway Workflow
+
+- Local migrations use `database/flyway.conf`, copied from
+  `database/flyway.conf.example`; the populated file is ignored by Git.
+- GitHub Actions uses repository secrets `FLYWAY_URL`, `FLYWAY_USER`, and
+  `FLYWAY_PASSWORD`.
+- Flyway is run before the backend API and worker images are built and published.
+- Existing Azure tables are adopted using `baselineOnMigrate=true` and
+  `baselineVersion=1`.
+- Future schema changes must be new immutable versioned migrations.
+- The GitHub runner must have network access to Azure PostgreSQL.
+
 ### Security and Access
 
 - UI should not have direct access to the DB, every data must be fetched through backend api
@@ -45,6 +68,3 @@ Endpoint - "psql-vectra.postgres.database.azure.com"
 ### Not Considered
 
 - KeyVault
-
-
-

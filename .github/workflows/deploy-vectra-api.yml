@@ -22,7 +22,12 @@ env:
   BUILD_CONTEXT: mobility-ai-service
 
 jobs:
+  migrate:
+    uses: ./.github/workflows/database-migrations.yml
+    secrets: inherit
+
   build-and-push:
+    needs: migrate
     runs-on: ubuntu-latest
 
     permissions:

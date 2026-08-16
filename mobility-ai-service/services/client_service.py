@@ -11,7 +11,6 @@ def utc_now() -> datetime:
 class ClientService:
     def __init__(self, repository=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
-        self.repository.initialize()
 
     def list_clients(self, coach_id: int) -> list[dict]:
         return [self._serialize_client(row) for row in self.repository.list_clients(coach_id)]

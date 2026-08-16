@@ -20,7 +20,6 @@ class AiPlanDraftService:
 
     def __init__(self, repository=None, plan_service: PlanService | None = None, generator=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
-        self.repository.initialize()
         self.plan_service = plan_service or PlanService(repository=self.repository)
         self.generator = generator or build_default_plan_draft_generator()
 

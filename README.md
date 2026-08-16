@@ -124,6 +124,9 @@ MobilityDetectionSystem/
 │   ├── queue_worker.py
 │   ├── Dockerfile.worker
 │   └── local.settings.json
+├── database/
+│   ├── migrations/
+│   └── flyway.conf.example
 ├── vectra-ui/
 │   ├── src/
 │   └── package.json
@@ -228,6 +231,47 @@ The backend reads infra settings from environment variables. For local developme
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
 - `POSTGRES_SSLMODE`
+
+### Flyway Database Migrations
+
+PostgreSQL schema changes are managed by Flyway. The migration files are stored in
+`database/migrations/` and are applied before the backend deployment. The backend
+does not create or alter tables at runtime.
+
+For local development, start the PostgreSQL Docker container first, copy
+`database/flyway.conf.example` to `database/flyway.conf`, and replace its
+placeholders with the container connection details. Then run Flyway from the
+repository root using the official Docker image:
+
+```bash
+docker run --rm \
+  -v "$PWD/database:/flyway/project" \
+  flyway/flyway:13.0.0 \
+  -configFiles=/flyway/project/flyway.conf \
+  -workingDirectory=project \
+  migrate
+```
+
+The local configuration uses `sslmode=disable` by default for a local container.
+Use the local database host as reachable from the Flyway container, commonly
+`host.docker.internal` when PostgreSQL is published on the host.
+
+The current Azure database is adopted with `baselineOnMigrate=true` at version 1;
+Flyway records the baseline without recreating the existing tables. New local
+databases execute `V1__baseline.sql`, followed by later migrations. The one-time
+`V2__backfill_legacy_jobs.sql` migration preserves the existing compatibility copy
+from `jobs` to `form_analyses`.
+
+GitHub Actions reads the Azure JDBC URL and credentials from these repository
+secrets:
+
+- `FLYWAY_URL`
+- `FLYWAY_USER`
+- `FLYWAY_PASSWORD`
+
+The URL should use PostgreSQL JDBC syntax, for example
+`jdbc:postgresql://<azure-host>:5432/<database>?sslmode=require`. Do not commit
+credentials or populated local Flyway configuration files.
 
 ### Optional/Auth Environment Variables
 
@@ -427,10 +471,31 @@ Behavior:
 
 - Runs on `push` to `main` when files under `mobility-ai-service/**` change.
 - Can also be started manually with `workflow_dispatch`.
+- Runs Flyway migrations before building or pushing backend images.
 - Builds and pushes two Docker images to Azure Container Registry:
   - `vectra-api`
   - `vectra-worker`
-- Tags each image with both the Git SHA and `latest`.
+  - Tags each image with both the Git SHA and `latest`.
+
+#### Database migrations
+
+Workflow:
+
+```text
+.github/workflows/database-migrations.yml
+```
+
+Behavior:
+
+- Runs on `main` pushes affecting `database/**` and can be started manually.
+- Is also reusable by the backend deployment workflow.
+- Runs Flyway `info`, `migrate`, and `validate` against the configured Azure database.
+- Migration failures prevent the backend images from being published.
+- The GitHub runner must be able to reach Azure PostgreSQL. If the database is
+  private, use a self-hosted runner or the appropriate private-network routing.
+
+Every future schema change must be added as a new immutable migration such as
+`V3__description.sql`; do not edit migrations that have already been applied.
 
 #### Frontend Static Web App
 

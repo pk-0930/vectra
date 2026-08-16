@@ -27,3 +27,4 @@ vectra-ui/node_modules/
 vectra-ui/dist/
 mobility-ai-service/local.settings.json
 local.settings.json
+database/flyway.conf

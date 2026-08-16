@@ -1,0 +1,13 @@
+# Copy this file to flyway.conf and replace the placeholders before running
+# Flyway against the local PostgreSQL Docker container.
+
+flyway.url=jdbc:postgresql://<POSTGRES_HOST>:<POSTGRES_PORT>/<POSTGRES_DB>?sslmode=disable
+flyway.user=<POSTGRES_USER>
+flyway.password=<POSTGRES_PASSWORD>
+flyway.locations=filesystem:migrations
+flyway.schemas=public
+flyway.defaultSchema=public
+flyway.table=flyway_schema_history
+flyway.baselineOnMigrate=true
+flyway.baselineVersion=1
+flyway.cleanDisabled=true

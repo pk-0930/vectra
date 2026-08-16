@@ -1,0 +1,86 @@
+name: Run Vectra database migrations
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "database/**"
+      - ".github/workflows/database-migrations.yml"
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      FLYWAY_URL:
+        required: true
+      FLYWAY_USER:
+        required: true
+      FLYWAY_PASSWORD:
+        required: true
+
+env:
+  FLYWAY_IMAGE: flyway/flyway:13.0.0
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FLYWAY_URL: ${{ secrets.FLYWAY_URL }}
+      FLYWAY_USER: ${{ secrets.FLYWAY_USER }}
+      FLYWAY_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Apply database migrations
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/database:/flyway/project:ro" \
+            -e FLYWAY_URL \
+            -e FLYWAY_USER \
+            -e FLYWAY_PASSWORD \
+            "$FLYWAY_IMAGE" \
+            -locations=filesystem:/flyway/project/migrations \
+            -schemas=public \
+            -defaultSchema=public \
+            -table=flyway_schema_history \
+            -baselineOnMigrate=true \
+            -baselineVersion=1 \
+            -cleanDisabled=true \
+            migrate
+
+      - name: Show migration status
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/database:/flyway/project:ro" \
+            -e FLYWAY_URL \
+            -e FLYWAY_USER \
+            -e FLYWAY_PASSWORD \
+            "$FLYWAY_IMAGE" \
+            -locations=filesystem:/flyway/project/migrations \
+            -schemas=public \
+            -defaultSchema=public \
+            -table=flyway_schema_history \
+            -baselineOnMigrate=true \
+            -baselineVersion=1 \
+            -cleanDisabled=true \
+            info
+
+      - name: Validate applied migrations
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/database:/flyway/project:ro" \
+            -e FLYWAY_URL \
+            -e FLYWAY_USER \
+            -e FLYWAY_PASSWORD \
+            "$FLYWAY_IMAGE" \
+            -locations=filesystem:/flyway/project/migrations \
+            -schemas=public \
+            -defaultSchema=public \
+            -table=flyway_schema_history \
+            -baselineOnMigrate=true \
+            -baselineVersion=1 \
+            -cleanDisabled=true \
+            validate

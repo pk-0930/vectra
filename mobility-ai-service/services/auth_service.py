@@ -13,7 +13,6 @@ class AuthService:
     def __init__(self, repository=None, security_service=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
         self.security_service = security_service or SecurityService()
-        self.repository.initialize()
 
     def sign_up_coach(
         self,

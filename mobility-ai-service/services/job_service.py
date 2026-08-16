@@ -13,7 +13,6 @@ def utc_now() -> datetime:
 class JobService:
     def __init__(self, repository=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
-        self.repository.initialize()
 
     def create_job(
         self,

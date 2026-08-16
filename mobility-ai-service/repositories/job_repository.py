@@ -29,29 +29,6 @@ class PostgresJobRepository:
         finally:
             connection.close()
 
-    def initialize(self):
-        with self._connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS jobs (
-                        id TEXT PRIMARY KEY,
-                        analysis_type TEXT NOT NULL,
-                        status TEXT NOT NULL,
-                        original_filename TEXT NOT NULL,
-                        stored_filename TEXT NOT NULL,
-                        video_blob_name TEXT NOT NULL,
-                        result_json JSONB NULL,
-                        error_message TEXT NULL,
-                        created_at TIMESTAMPTZ NOT NULL,
-                        updated_at TIMESTAMPTZ NOT NULL,
-                        started_at TIMESTAMPTZ NULL,
-                        completed_at TIMESTAMPTZ NULL
-                    )
-                    """
-                )
-            connection.commit()
-
     def insert_job(self, payload: dict) -> dict:
         with self._connect() as connection:
             with connection.cursor() as cursor:

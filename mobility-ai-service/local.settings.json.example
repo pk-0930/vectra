@@ -1,0 +1,27 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "BLOB_UPLOADS_CONTAINER": "uploads",
+    "BLOB_FRAMES_CONTAINER": "frames",
+    "BLOB_ANNOTATED_FRAMES_CONTAINER": "annotated-frames",
+    "ANALYSIS_JOBS_QUEUE_NAME": "analysis-jobs",
+    "ANALYSIS_JOBS_POISON_QUEUE_NAME": "analysis-jobs-poison",
+    "ANALYSIS_JOB_VISIBILITY_TIMEOUT": "1800",
+    "ANALYSIS_JOB_MAX_DEQUEUE_COUNT": "3",
+    "POSTGRES_HOST": "localhost",
+    "POSTGRES_PORT": "5432",
+    "POSTGRES_DB": "Vectra",
+    "POSTGRES_USER": "vectraadmin",
+    "POSTGRES_PASSWORD": "admin@123",
+    "POSTGRES_SSLMODE": "disable",
+    "AUTH_TOKEN_SECRET": "vectra-dev-secret",
+    "AUTH_TOKEN_EXPIRATION_HOURS": "24",
+    "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com/",
+    "AZURE_OPENAI_API_KEY": "",
+    "AZURE_OPENAI_DEPLOYMENT": "gpt-4.1-mini",
+    "AZURE_OPENAI_API_VERSION": "2024-12-01-preview",
+    "AZURE_OPENAI_MODEL_NAME": "gpt-4.1-mini",
+    "AI_PROVIDER": "azure_openai"
+  }
+}

@@ -295,6 +295,75 @@ credentials or populated local Flyway configuration files.
 - Node.js 18+
 - npm
 
+### Local storage and database
+
+Docker Desktop (or Docker Engine with Compose) runs Azurite and PostgreSQL. The API
+and worker run on your host machine; no separate Azurite installation is needed.
+
+From the repository root, copy `.env.example` to `.env` if it does not exist and
+configure the PostgreSQL values. Then start the infrastructure:
+
+```bash
+docker compose up -d --wait
+```
+
+To start only storage, use `docker compose up -d --wait azurite`. Apply the local
+Flyway migrations described above before using the API with a new database.
+
+Copy `mobility-ai-service/local.settings.json.example` to
+`mobility-ai-service/local.settings.json` only if you do not already have one.
+For an existing file, set the following value inside `Values` and remove
+`BLOB_STORAGE_CONNECTION_STRING` and `QUEUE_STORAGE_CONNECTION_STRING`:
+
+```json
+"AzureWebJobsStorage": "UseDevelopmentStorage=true"
+```
+
+Both storage clients use this shared setting. In each terminal used to start the
+API or worker, clear any previously exported storage settings so the local file
+can take effect:
+
+```bash
+unset AzureWebJobsStorage BLOB_STORAGE_CONNECTION_STRING QUEUE_STORAGE_CONNECTION_STRING
+```
+
+Match the local PostgreSQL settings to `.env`. Configure Azure OpenAI separately
+if you need AI plan generation; Azurite replaces only Azure Storage. Existing
+cloud data is not copied locally. The development-storage shortcut targets
+localhost and is intended for host-run applications, not API/worker containers.
+
+In Azure Storage Explorer, expand **Local & Attached > Storage Accounts >
+Emulator - Default Ports**. If needed, add a **Local storage emulator** connection
+using HTTP, host `127.0.0.1`, blob port `10000`, queue port `10001`, and table port
+`10002`. No Azure sign-in is needed. See the
+[Storage Explorer emulator guide](https://learn.microsoft.com/en-us/azure/storage/common/storage-explorer-emulators).
+
+The app creates `analysis-jobs` and `analysis-jobs-poison` when its queue service
+initializes. Blob containers appear on first upload: `uploads`, `frames`,
+`annotated-frames`, `client-progress-photos`, `nutrition-plan-pdfs`, and
+`workout-plan-pdfs`. Start Azurite before the API and worker; restart those
+processes if they were started before storage was ready.
+
+Inspect status with `docker compose ps azurite` and logs with
+`docker compose logs azurite`. Stop with `docker compose stop azurite`; restart
+with `docker compose up -d --wait azurite`. The `azurite_data` volume preserves
+blobs and queues across restarts and container recreation.
+
+To deliberately delete **only emulator data**, first stop the API and worker,
+then capture the volume name and remove only that volume:
+
+```bash
+azurite_container_id=$(docker compose ps -aq azurite)
+azurite_volume=$(docker inspect "$azurite_container_id" --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}')
+docker compose rm -sf azurite
+docker volume rm "$azurite_volume"
+docker compose up -d --wait azurite
+```
+
+This reset requires an existing Azurite container. PostgreSQL data remains, so
+records referencing deleted blobs will no longer load those files. Avoid
+`docker compose down -v` for a storage-only reset: it also deletes PostgreSQL data.
+
 ### 1. Backend Setup
 
 From `mobility-ai-service`:

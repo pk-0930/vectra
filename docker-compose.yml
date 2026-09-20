@@ -1,4 +1,25 @@
 services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: azurite --location /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    ports:
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:10001:10001"
+      - "127.0.0.1:10002:10002"
+    volumes:
+      - azurite_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const net = require('net'); Promise.all([10000, 10001].map(port => new Promise((resolve, reject) => { const s = net.connect(port, '127.0.0.1', () => { s.end(); resolve(); }); s.setTimeout(2000, () => { s.destroy(); reject(new Error('timeout')); }); s.on('error', reject); }))).then(() => process.exit(0), () => process.exit(1));"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
     container_name: myapp-postgres
@@ -28,3 +49,4 @@ services:
 
 volumes:
   postgres_data:
+  azurite_data:

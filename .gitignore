@@ -8,6 +8,8 @@ TEMP_FILE.md
 .env
 .env.*
 !.env.example
+!vectra-ui/.env.development
+!vectra-ui/.env.production
 
 # Logs
 *.log

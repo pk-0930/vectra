@@ -153,6 +153,7 @@ class AccessControlTests(foundations.DisposablePostgresTests):
         from pathlib import Path
         import secrets
         from unittest.mock import patch
+        from config.features import analysis_enabled
         from config.auth_config import AuthConfig
         from services.security_service import SecurityService
         from services.auth_service import AuthService
@@ -175,6 +176,9 @@ class AccessControlTests(foundations.DisposablePostgresTests):
         module.AiPlanDraftService=lambda repository, plans: AiPlanDraftService(repository,plans,generator=Mock())
         security=SecurityService(AuthConfig(secrets.token_urlsafe(32),24))
         module.auth_service=AuthService(PostgresPlatformRepository(self.config),security)
+        # Exercise the protected media route independently of the default feature flag.
+        # With analysis disabled, require_analysis intentionally returns 404 first.
+        module.analysis_enabled=lambda: True
         module.storage_asset_service.get_progress_photo.return_value=(b'image','image/jpeg')
         module.pdf_service.render_simple_pdf.return_value=b'%PDF-test'
         def request(path,user=202,method='GET',body=None,organization=None,query=''):

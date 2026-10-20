@@ -15,6 +15,15 @@ class PostgresPlatformRepository:
     def __init__(self, config: PostgresConfig):
         self.config = config
 
+    def for_organization(self, organization_id: int):
+        from repositories.organization_repository import OrganizationRepository
+        return OrganizationRepository(self.config, organization_id)
+
+    @staticmethod
+    def _validate_plan_table(table_name: str):
+        if table_name not in {"nutrition_plans", "workout_plans"}:
+            raise ValueError("Unsupported plan table.")
+
     @contextmanager
     def _connect(self):
         if psycopg is None:
@@ -55,6 +64,29 @@ class PostgresPlatformRepository:
                 cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
                 return cursor.fetchone()
 
+    def list_user_organizations(self, user_id: int) -> list[dict]:
+        """Current relationship summaries, never token claims or paid entitlements."""
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT o.id AS organization_id, o.name, o.organization_type,
+                        r.id AS relationship_id,
+                        ARRAY(SELECT role.role FROM organization_staff_roles role
+                            WHERE role.organization_id=o.id AND role.relationship_id=r.id
+                                AND role.revoked_at IS NULL ORDER BY role.role) AS staff_roles,
+                        c.id AS client_id
+                    FROM organization_relationships r
+                    JOIN organizations o ON o.id=r.organization_id
+                    LEFT JOIN clients c ON c.organization_id=o.id
+                        AND c.organization_relationship_id=r.id
+                    WHERE r.user_id=%s AND r.status='active' AND o.status='active'
+                    ORDER BY o.id
+                    """,
+                    (user_id,),
+                )
+                return cursor.fetchall()
+
     def create_coach(self, payload: dict) -> dict:
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -91,6 +123,7 @@ class PostgresPlatformRepository:
                     payload,
                 )
                 row = cursor.fetchone()
+            connection.execute("SELECT ensure_coach_business(%s, false)", (row["id"],))
             connection.commit()
         return row
 
@@ -294,6 +327,7 @@ class PostgresPlatformRepository:
                 return cursor.fetchall()
 
     def create_plan(self, table_name: str, payload: dict) -> dict:
+        self._validate_plan_table(table_name)
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -331,6 +365,7 @@ class PostgresPlatformRepository:
         return row
 
     def fetch_plan(self, table_name: str, plan_id: int, coach_id: int) -> dict | None:
+        self._validate_plan_table(table_name)
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -339,12 +374,14 @@ class PostgresPlatformRepository:
                     FROM {table_name} p
                     JOIN clients c ON c.id = p.client_id
                     WHERE p.id = %s AND c.coach_id = %s
+                        AND p.organization_id = c.organization_id
                     """,
                     (plan_id, coach_id),
                 )
                 return cursor.fetchone()
 
     def list_plans(self, table_name: str, client_id: int, coach_id: int) -> list[dict]:
+        self._validate_plan_table(table_name)
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -353,6 +390,7 @@ class PostgresPlatformRepository:
                     FROM {table_name} p
                     JOIN clients c ON c.id = p.client_id
                     WHERE p.client_id = %s AND c.coach_id = %s
+                        AND p.organization_id = c.organization_id
                     ORDER BY p.period_start DESC, p.created_at DESC
                     """,
                     (client_id, coach_id),
@@ -360,13 +398,14 @@ class PostgresPlatformRepository:
                 return cursor.fetchall()
 
     def update_plan_pdf_blob_name(self, table_name: str, plan_id: int, pdf_blob_name: str) -> dict | None:
+        self._validate_plan_table(table_name)
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
                     UPDATE {table_name}
                     SET pdf_blob_name = %s
-                    WHERE id = %s
+                    WHERE organization_id IS NOT NULL AND id = %s
                     RETURNING *
                     """,
                     (pdf_blob_name, plan_id),
@@ -433,7 +472,7 @@ class PostgresPlatformRepository:
         query = """
             SELECT *
             FROM ai_plan_drafts
-            WHERE client_id = %(client_id)s AND coach_id = %(coach_id)s
+            WHERE organization_id IS NOT NULL AND client_id = %(client_id)s AND coach_id = %(coach_id)s
         """
         params = {"client_id": client_id, "coach_id": coach_id}
         if plan_kind is not None:
@@ -453,7 +492,7 @@ class PostgresPlatformRepository:
                     """
                     SELECT *
                     FROM ai_plan_drafts
-                    WHERE id = %s AND coach_id = %s
+                    WHERE organization_id IS NOT NULL AND id = %s AND coach_id = %s
                     """,
                     (draft_id, coach_id),
                 )
@@ -472,7 +511,7 @@ class PostgresPlatformRepository:
                         content_json = %(content_json)s::jsonb,
                         coach_prompt = %(coach_prompt)s,
                         updated_at = %(updated_at)s
-                    WHERE id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
+                    WHERE organization_id IS NOT NULL AND id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
                     RETURNING *
                     """,
                     {
@@ -501,7 +540,7 @@ class PostgresPlatformRepository:
                         coach_prompt = %(coach_prompt)s,
                         model_name = %(model_name)s,
                         updated_at = %(updated_at)s
-                    WHERE id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
+                    WHERE organization_id IS NOT NULL AND id = %(id)s AND coach_id = %(coach_id)s AND status = 'draft'
                     RETURNING *
                     """,
                     {
@@ -530,7 +569,7 @@ class PostgresPlatformRepository:
                     SET status = %s,
                         updated_at = %s,
                         approved_plan_id = %s
-                    WHERE id = %s AND coach_id = %s
+                    WHERE organization_id IS NOT NULL AND id = %s AND coach_id = %s
                     RETURNING *
                     """,
                     (status, updated_at, approved_plan_id, draft_id, coach_id),
@@ -587,7 +626,7 @@ class PostgresPlatformRepository:
     def fetch_form_analysis(self, analysis_id: str) -> dict | None:
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM form_analyses WHERE id = %s", (analysis_id,))
+                cursor.execute("SELECT * FROM form_analyses WHERE organization_id IS NOT NULL AND id = %s", (analysis_id,))
                 return cursor.fetchone()
 
     def fetch_form_analysis_for_coach(self, analysis_id: str, coach_id: int) -> dict | None:
@@ -597,8 +636,8 @@ class PostgresPlatformRepository:
                     """
                     SELECT fa.*
                     FROM form_analyses fa
-                    LEFT JOIN clients c ON c.id = fa.client_id
-                    WHERE fa.id = %s AND (fa.client_id IS NULL OR c.coach_id = %s)
+                    JOIN clients c ON c.id = fa.client_id AND c.organization_id = fa.organization_id
+                    WHERE fa.id = %s AND c.coach_id = %s
                     """,
                     (analysis_id, coach_id),
                 )
@@ -608,8 +647,8 @@ class PostgresPlatformRepository:
         query = """
             SELECT fa.*
             FROM form_analyses fa
-            LEFT JOIN clients c ON c.id = fa.client_id
-            WHERE fa.client_id IS NULL OR c.coach_id = %(coach_id)s
+            JOIN clients c ON c.id = fa.client_id AND c.organization_id = fa.organization_id
+            WHERE c.coach_id = %(coach_id)s
         """
         params: dict[str, int] = {"coach_id": coach_id, "limit": limit}
         if client_id is not None:
@@ -631,7 +670,7 @@ class PostgresPlatformRepository:
                     SET status = 'running',
                         started_at = %s,
                         updated_at = %s
-                    WHERE id = %s AND status = 'queued'
+                    WHERE organization_id IS NOT NULL AND id = %s AND status = 'queued'
                     RETURNING *
                     """,
                     (started_at, started_at, analysis_id),
@@ -658,7 +697,7 @@ class PostgresPlatformRepository:
                         updated_at = %s,
                         started_at = NULL,
                         completed_at = NULL
-                    WHERE id = %s AND status = 'running'
+                    WHERE organization_id IS NOT NULL AND id = %s AND status = 'running'
                     RETURNING *
                     """,
                     (error_message, updated_at, analysis_id),
@@ -687,7 +726,7 @@ class PostgresPlatformRepository:
                         error_message = %s,
                         updated_at = %s,
                         completed_at = %s
-                    WHERE id = %s
+                    WHERE organization_id IS NOT NULL AND id = %s
                     RETURNING *
                     """,
                     (
@@ -711,7 +750,7 @@ class PostgresPlatformRepository:
                     UPDATE form_analyses
                     SET coach_feedback_note = %s,
                         updated_at = %s
-                    WHERE id = %s
+                    WHERE organization_id IS NOT NULL AND id = %s
                     RETURNING *
                     """,
                     (feedback_note, updated_at, analysis_id),

@@ -12,7 +12,12 @@ class RetryableQueueProcessingError(Exception):
 
 
 def process_queue_message(job_service: JobService, job_runner: JobRunner, message: dict) -> bool:
-    logging.info("process queue message ENTER")
+    if not isinstance(message, dict):
+        raise NonRetryableQueueMessageError("Queue message must be an object.")
+    organization_id = message.get("organization_id")
+    if type(organization_id) is not int or organization_id <= 0:
+        raise NonRetryableQueueMessageError("Queue message requires a valid organization_id.")
+    job_service = job_service.for_organization(organization_id)
     job_id = message.get("analysis_id") or message.get("job_id")
     analysis_type = message.get("analysis_type")
 

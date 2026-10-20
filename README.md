@@ -498,7 +498,7 @@ Legacy compatibility:
 - Frontend auth now uses bearer tokens.
 - Protected endpoints expect `Authorization: Bearer <token>`.
 - PDF download endpoints also support `?token=<token>` so browser-open download links work from the SPA.
-- Progress photo image URLs also support `?token=<token>` so authenticated image previews can load inside the SPA.
+- Media and PDF requests require bearer authorization and the selected business header; reusable query-string tokens are rejected. The SPA fetches private blobs and revokes temporary object URLs on context changes.
 
 ## Testing
 
@@ -594,3 +594,39 @@ Behavior:
 - Client-specific form analysis is the primary analysis workflow; `Recent Analysis` is secondary cross-client browsing.
 - Dashboard is intentionally KPI/navigation-only.
 - Async processing remains queue-driven and does not rely on DB polling or Azure Functions.
+
+
+### Email and identity worker (gym-management Step 3)
+
+Step 3 introduced V7; the current API and email worker require migrations through V9. Configure `PUBLIC_WEB_BASE_URL`,
+`AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING`, and `AZURE_COMMUNICATION_SERVICES_SENDER_ADDRESS`
+in ignored local settings or deployment secrets. The API and email worker must share `AUTH_TOKEN_SECRET`.
+Run `venv/bin/python email_worker.py` from `mobility-ai-service/` as a separate process from the analysis worker.
+New accounts must verify email; pre-V7 accounts retain access. Password resets revoke existing sessions.
+See [Step 3 operation, verification and release gates](Specs/GYM_MANAGEMENT_STEP_3_REVIEW.md).
+
+### Business software billing worker (gym-management Step 4)
+
+Apply Flyway V8 before the updated API and email/billing workers. Configure Razorpay test credentials and the business-type software catalogue using the placeholders in `mobility-ai-service/local.settings.json.example`. An empty catalogue disables checkout; no production prices are checked in.
+
+Run `venv/bin/python billing_worker.py` from `mobility-ai-service/` alongside `email_worker.py`. Signed events are accepted at `/webhooks/razorpay`; scheduled reconciliation also repairs missed events. Inspect failures with `venv/bin/python scripts/billing_admin.py`.
+
+See [Step 4 policies, verification, recovery and release gates](Specs/GYM_MANAGEMENT_STEP_4_REVIEW.md).
+
+### Gym setup and public registration (gym-management Step 5)
+
+Apply Flyway through **V9** before starting the current API and email worker, and install the updated backend requirements. Set `PUBLIC_WEB_BASE_URL` to your stable HTTPS frontend origin. Azure Static Web Apps uses `vectra-ui/public/staticwebapp.config.json` to serve direct `/join/{uuid}` links.
+
+Owners/admins of an operational gym can open **Gym setup** to publish branding and gym/PT catalogues. Only owners can confirm changes to the payment recipient, UPI ID or QR. Save setup, enable registration, and download the registration QR or reception poster. Registration creates an identity relationship and an unpaid pending purchase with immutable terms; payment verification/activation is Step 6.
+
+See [Step 5 implementation, verification and release order](Specs/GYM_MANAGEMENT_STEP_5_REVIEW.md).
+
+## Gym management web delivery
+
+The current implementation includes member coaching access, verified client invitations,
+owner reports and the persistent web inbox. Native mobile apps and push are deferred.
+See [web implementation and verification](Specs/GYM_MANAGEMENT_WEB_COMPLETION_REVIEW.md)
+and [deployment, pilot and rollback instructions](Specs/WEB_RELEASE_RUNBOOK.md).
+Apply Flyway through V13 before running the updated API. The container build workflow
+publishes images; use the runbook's explicit release helper to update provisioned targets.
+PR validation is in `.github/workflows/validate-web.yml` and does not deploy the web app.

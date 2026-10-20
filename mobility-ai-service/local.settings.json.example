@@ -1,6 +1,7 @@
 {
   "IsEncrypted": false,
   "Values": {
+    "FORM_ANALYSIS_ENABLED": "false",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "BLOB_UPLOADS_CONTAINER": "uploads",
     "BLOB_FRAMES_CONTAINER": "frames",
@@ -15,13 +16,23 @@
     "POSTGRES_USER": "vectraadmin",
     "POSTGRES_PASSWORD": "admin@123",
     "POSTGRES_SSLMODE": "disable",
-    "AUTH_TOKEN_SECRET": "vectra-dev-secret",
+    "AUTH_TOKEN_SECRET": "",
     "AUTH_TOKEN_EXPIRATION_HOURS": "24",
     "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com/",
     "AZURE_OPENAI_API_KEY": "",
     "AZURE_OPENAI_DEPLOYMENT": "gpt-4.1-mini",
     "AZURE_OPENAI_API_VERSION": "2024-12-01-preview",
     "AZURE_OPENAI_MODEL_NAME": "gpt-4.1-mini",
-    "AI_PROVIDER": "azure_openai"
+    "AI_PROVIDER": "azure_openai",
+    "PUBLIC_WEB_BASE_URL": "http://localhost:5173",
+    "AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING": "",
+    "AZURE_COMMUNICATION_SERVICES_SENDER_ADDRESS": "",
+    "RAZORPAY_MODE": "test",
+    "RAZORPAY_KEY_ID": "",
+    "RAZORPAY_KEY_SECRET": "",
+    "RAZORPAY_WEBHOOK_SECRET": "",
+    "SOFTWARE_PLANS_JSON": "[]",
+    "SOFTWARE_BILLING_GRACE_DAYS": "7",
+    "SOFTWARE_TERMS_VERSION": "software-v1"
   }
 }

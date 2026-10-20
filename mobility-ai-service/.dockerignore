@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+local.settings.json
+.git/
+.pytest_cache/
+.mypy_cache/
+*.log
+uploads/
+outputs/
+artifacts/

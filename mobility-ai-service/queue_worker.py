@@ -4,6 +4,7 @@ import sys
 from datetime import UTC, datetime
 from functools import lru_cache
 
+from config.features import analysis_enabled
 from config.queue_storage_config import get_queue_storage_config
 from config.local_settings_loader import load_local_settings
 from services.job_runner import JobRunner
@@ -36,18 +37,21 @@ def build_poison_payload(*, message_id: str, dequeue_count: int, raw_content: st
 
 
 def mark_job_failed_if_present(job_service: JobService, payload: dict | None, error_message: str):
-    if not payload:
+    service = scoped_message_service(job_service, payload)
+    if service is None:
         return
-
     job_id = payload.get("analysis_id") or payload.get("job_id")
-    if not job_id:
-        return
+    if job_id:
+        service.mark_job_failed(job_id, error_message)
 
-    job = job_service.get_job(job_id)
-    if job is None:
-        return
 
-    job_service.mark_job_failed(job_id, error_message)
+def scoped_message_service(job_service, payload):
+    if not isinstance(payload, dict):
+        return None
+    organization_id = payload.get("organization_id")
+    if type(organization_id) is not int or organization_id <= 0:
+        return None
+    return job_service.for_organization(organization_id)
 
 
 def move_message_to_poison_queue(
@@ -57,6 +61,7 @@ def move_message_to_poison_queue(
     message,
     payload: dict | None,
     error_message: str,
+    fail_claimed_job: bool = False,
 ):
     queue_service.enqueue_poison_job(
         build_poison_payload(
@@ -67,11 +72,15 @@ def move_message_to_poison_queue(
             error_message=error_message,
         )
     )
-    mark_job_failed_if_present(job_service, payload, error_message)
+    if fail_claimed_job:
+        mark_job_failed_if_present(job_service, payload, error_message)
     queue_service.delete_analysis_job(message)
 
 
 def main() -> int:
+    if not analysis_enabled():
+        logging.info("Form analysis disabled; queue left untouched.")
+        return 0
     queue_service, job_service, job_runner = get_runtime_dependencies()
     queue_config = get_queue_storage_config()
     message = queue_service.receive_analysis_job(
@@ -86,6 +95,8 @@ def main() -> int:
 
     try:
         payload = json.loads(message.content)
+        if not isinstance(payload, dict):
+            raise NonRetryableQueueMessageError("Queue message must be an object.")
         analysis_identifier = payload.get("analysis_id") or payload.get("job_id")
         logging.info("Processing analysis queue message for analysis_id=%s", analysis_identifier)
         process_queue_message(job_service, job_runner, payload)
@@ -122,9 +133,10 @@ def main() -> int:
         return 1
     except RetryableQueueProcessingError as exc:
         error_message = str(exc)
-        analysis_id = payload.get("analysis_id") or payload.get("job_id") if payload else None
-        if analysis_id:
-            job_service.requeue_job_for_retry(analysis_id, error_message)
+        analysis_id = payload.get("analysis_id") or payload.get("job_id") if isinstance(payload, dict) else None
+        service = scoped_message_service(job_service, payload)
+        if analysis_id and service and message.dequeue_count < queue_config.max_dequeue_count:
+            service.requeue_job_for_retry(analysis_id, error_message)
 
         if message.dequeue_count >= queue_config.max_dequeue_count:
             logging.exception(
@@ -137,6 +149,7 @@ def main() -> int:
                 message=message,
                 payload=payload,
                 error_message=error_message,
+                fail_claimed_job=True,
             )
             return 1
 
@@ -147,10 +160,8 @@ def main() -> int:
         return 1
     except Exception as exc:
         error_message = str(exc)
-        analysis_id = payload.get("analysis_id") or payload.get("job_id") if payload else None
-        if analysis_id:
-            job_service.requeue_job_for_retry(analysis_id, error_message)
-
+        # No proof that this path acquired a claim: never mutate a job from
+        # untrusted payload identifiers while handling an unexpected error.
         if message.dequeue_count >= queue_config.max_dequeue_count:
             logging.exception(
                 "Unexpected failure reached retry limit for message_id=%s. Moving to poison queue.",

@@ -1,3 +1,9 @@
+import { features } from '../services/features'
+import { useBusiness } from '../components/BusinessContext'
+import { downloadProtected } from '../services/download'
+import ProtectedImage from '../components/ProtectedImage'
+import ProgressGallery from '../components/ProgressGallery'
+import { Dialog, StatusBadge } from '../design-system/components'
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -14,16 +20,13 @@ import {
   Target,
   UserRound,
   Video,
-  X,
   type LucideIcon,
 } from "lucide-react";
-import SideNav from "../components/SideNav";
 import { API_BASE_URL } from "../services/apiConfig";
 import {
   addClientGoal,
   createClient,
   fetchClient,
-  getClientProgressPhotoUrl,
   listClientProgressPhotos,
   listClients,
   updateClient,
@@ -50,7 +53,6 @@ import {
   listClientSquatJobs,
   saveAnalysisFeedback,
 } from "../services/squatApi";
-import { getStoredAccessToken } from "../services/session";
 import { PRIMARY_BORDER, THEME } from "../theme";
 import type { Client, ProgressPhoto } from "../types/client";
 import type { AppTab } from "../types/navigation";
@@ -125,16 +127,16 @@ const initialAiDraftForm = (): AiDraftFormState => ({
 });
 
 export default function ClientsPage({
-  activeTab,
-  onTabChange,
-  onLogout,
   selectedClientId,
   requestedAnalysis,
   onSelectClient,
   onAnalysisLoaded,
 }: ClientsPageProps) {
+  const [clientSearch, setClientSearch] = useState('')
   const [detailTab, setDetailTab] = useState<DetailTab>("profile");
   const [drawer, setDrawer] = useState<DrawerName>(null);
+  const business = useBusiness()
+  const canCreateClient = business?.staff_roles.some(role => role === 'owner' || role === 'admin')
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [nutritionPlans, setNutritionPlans] = useState<Plan[]>([]);
@@ -736,29 +738,27 @@ export default function ClientsPage({
   }
 
   return (
-    <div style={styles.page}>
-      <SideNav activeTab={activeTab} onTabChange={onTabChange} />
+    <div>
 
-      <main style={styles.main}>
-        <div style={styles.header}>
+      <main className="page-content">
+        <div className="flow-header" style={styles.header}>
           <div>
             <h1 style={styles.pageTitle}>Clients</h1>
             <p style={styles.pageSubtitle}>
-              Open a client-owned workspace for profile, nutrition, workout, and form analysis workflows.
+              The people you coach. The context to help them progress.
             </p>
           </div>
-          <div style={styles.headerActions}>
-            <button style={styles.primaryButton} onClick={() => setDrawer("create-client")}><Plus size={16} />Create client</button>
-            <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
+          <div className="header-actions">
+            {canCreateClient && <button style={styles.primaryButton} onClick={() => setDrawer("create-client")}><Plus size={16} />Create client</button>}
           </div>
         </div>
 
-        {error ? <div style={styles.errorBox}>{error}</div> : null}
-        {successMessage ? <div style={styles.successBox}>{successMessage}</div> : null}
+        {error ? <div role="alert" style={styles.errorBox}>{error}</div> : null}
+        {successMessage ? <div role="status" style={styles.successBox}>{successMessage}</div> : null}
 
-        <div style={styles.layout}>
-          <section style={styles.clientRail}>
-            <div style={styles.panelHeader}>
+        <div className="client-layout">
+          <section className="client-rail" style={styles.clientRail}>
+            <div className="flow-header" style={styles.panelHeader}>
               <div style={styles.panelTitle}>Client list</div>
               <button style={styles.secondaryButton} onClick={loadClients} disabled={isLoading}>
                 <RefreshCw size={16} />
@@ -767,15 +767,19 @@ export default function ClientsPage({
             </div>
 
             {!clients.length && !isLoading ? (
-              <EmptyState title="No clients yet" text="Create a client to start profile tracking, planning, and form analysis." />
+              <EmptyState title="No clients yet" text="Create a client to start profile tracking and planning." />
             ) : null}
 
+            <label className="client-search">Find a client<input type="search" placeholder="Search by name" value={clientSearch} onChange={event => setClientSearch(event.target.value)} /></label>
+            {isLoading && <p role="status">Loading clients…</p>}
+            {clients.length > 0 && !clients.some(client => `${client.first_name} ${client.last_name}`.toLowerCase().includes(clientSearch.toLowerCase())) && <p>No clients match your search.</p>}
             <div style={styles.clientList}>
-              {clients.map((client) => {
+              {clients.filter(client => `${client.first_name} ${client.last_name}`.toLowerCase().includes(clientSearch.toLowerCase())).map((client) => {
                 const isSelected = client.id === selectedClientId;
                 return (
                   <button
                     key={client.id}
+                    aria-pressed={isSelected}
                     style={isSelected ? styles.clientCardActive : styles.clientCard}
                     onClick={() => onSelectClient(client)}
                   >
@@ -793,31 +797,31 @@ export default function ClientsPage({
             {!selectedClientId ? (
               <EmptyPanel
                 title="Choose a client"
-                text="Select a client to open their profile, nutrition, workout, and form analysis workspace."
+                text="Select a client to open their profile, nutrition, and workout workspace."
               />
             ) : isDetailLoading ? (
               <EmptyPanel title="Loading client workspace" text="Pulling profile, plans, progress photos, and analysis history." />
             ) : selectedClient ? (
               <>
                 <div style={styles.panel}>
-                  <div style={styles.workspaceHeader}>
-                    <div>
-                      <div style={styles.detailTitle}>{selectedClient.first_name} {selectedClient.last_name}</div>
+                  <div className="flow-header" style={styles.workspaceHeader}>
+                    <div className="profile-identity"><span className="avatar" aria-hidden="true">{selectedClient.first_name[0]}{selectedClient.last_name[0]}</span><div>
+                      <h2 style={styles.detailTitle}>{selectedClient.first_name} {selectedClient.last_name}</h2>
                       <div style={styles.clientMeta}>
-                        {selectedClient.current_goal_type ? formatGoal(selectedClient.current_goal_type) : "No current goal"} · {selectedClient.is_active ? "Active client" : "Inactive client"}
+                        {selectedClient.current_goal_type ? formatGoal(selectedClient.current_goal_type) : "No current goal"} · <StatusBadge tone={selectedClient.is_active ? "success" : "neutral"}>{selectedClient.is_active ? "Active" : "Inactive"}</StatusBadge>
                       </div>
-                    </div>
+                    </div></div>
                     <button style={styles.secondaryButton} onClick={() => loadClientWorkspace(selectedClient.id)}>
                       Refresh detail
                     </button>
                   </div>
 
-                  <div style={styles.detailTabRow}>
-                    {renderDetailTab("profile", "Profile", UserRound, detailTab, setDetailTab)}
+                  <nav className="client-tabs" aria-label="Client workspace sections">
+                    {renderDetailTab("profile", "Overview", UserRound, detailTab, setDetailTab)}
                     {renderDetailTab("nutrition", "Nutrition", Apple, detailTab, setDetailTab)}
                     {renderDetailTab("workout", "Workout", Dumbbell, detailTab, setDetailTab)}
-                    {renderDetailTab("form-analysis", "Form Analysis", Video, detailTab, setDetailTab)}
-                  </div>
+                    {features.formAnalysis && renderDetailTab("form-analysis", "Form Analysis", Video, detailTab, setDetailTab)}
+                  </nav>
                 </div>
 
                 {detailTab === "profile" ? (
@@ -858,7 +862,7 @@ export default function ClientsPage({
                   />
                 ) : null}
 
-                {detailTab === "form-analysis" ? (
+                {features.formAnalysis && detailTab === "form-analysis" ? (
                   <FormAnalysisTab
                     selectedClient={selectedClient}
                     analysisFile={analysisFile}
@@ -895,6 +899,7 @@ export default function ClientsPage({
       </main>
 
       <Drawer title={getDrawerTitle(drawer)} isOpen={drawer !== null} onClose={() => setDrawer(null)}>
+        {error && <p role="alert" className="error-notice">{error}</p>}
         {drawer === "create-client" ? (
           <form onSubmit={handleCreateClient} style={styles.form}>
             <LabeledField label="First name">
@@ -1039,7 +1044,7 @@ function ProfileTab({
 }) {
   return (
     <>
-      <div style={styles.twoColumnGrid}>
+      <div className="responsive-pair">
         <div style={styles.panel}>
           <SectionHeader icon={UserRound} title="Profile summary" actionLabel="Edit profile" onAction={onEditProfile} />
           <div style={styles.snapshotGrid}>
@@ -1060,19 +1065,7 @@ function ProfileTab({
 
       <div style={styles.panel}>
         <SectionHeader icon={Camera} title="Progress photo timeline" meta={`${photos.length} ${photos.length === 1 ? "entry" : "entries"}`} actionLabel="Add photo" onAction={onAddPhoto} />
-        {!photos.length ? <EmptyState title="No progress photos" text="Add weekly or monthly check-ins to track visual progress." /> : null}
-        <div style={styles.progressTimeline}>
-          {photos.map((photo) => (
-            <div key={photo.id} style={styles.progressCard}>
-              <img src={getClientProgressPhotoUrl(photo.blob_name)} alt={photo.caption ?? "Client progress photo"} style={styles.progressImage} />
-              <div style={styles.progressBody}>
-                <div style={styles.historyTitle}>{formatTimelineType(photo.timeline_type)} check-in</div>
-                <div style={styles.historyMeta}>{new Date(photo.captured_on).toLocaleDateString()} · uploaded {new Date(photo.created_at).toLocaleDateString()}</div>
-                <div style={styles.historySummary}>{photo.caption ?? "No caption added."}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ProgressGallery photos={photos} />
       </div>
     </>
   );
@@ -1114,7 +1107,7 @@ function PlanTab({
         <p style={styles.panelText}>{helper}</p>
       </div>
 
-      <div style={styles.twoColumnGrid}>
+      <div className="responsive-pair">
         <div style={styles.panel}>
           <SectionHeader icon={FileText} title="Latest plan snapshot" />
           {latestPlan ? <PlanHistoryCard plan={latestPlan} getPdfUrl={getPdfUrl} onOpen={onOpenPlan} /> : <EmptyState title={`No ${typeLabel.toLowerCase()} plan yet`} text={`Create the first ${typeLabel.toLowerCase()} plan for this client.`} />}
@@ -1190,7 +1183,7 @@ function FormAnalysisTab({
   const highlightedFrontSnapshot = supportsKneeTracking ? analysis?.frames?.knee_frame ?? null : null;
 
   return (
-    <div style={styles.formAnalysisGrid}>
+    <div className="analysis-layout">
       <section style={styles.analysisMain}>
         <div style={styles.panel}>
           <SectionHeader icon={Video} title="Upload squat video" meta={selectedClient.first_name} />
@@ -1222,13 +1215,13 @@ function FormAnalysisTab({
           <>
             <div style={styles.panel}>
               <SectionHeader icon={Activity} title="Frame and rep inspection" meta={formatView(analysis.video_view)} />
-              <div style={styles.heroSection}>
+              <div className="responsive-pair">
                 <div style={styles.videoFrame}>
                   {supportsRepDetection && selectedRepSnapshot ? (
-                    <img src={`${API_BASE_URL}${selectedRepSnapshot.image_path}`} alt={`Rep ${selectedRepSnapshot.rep_number} bottom frame`} style={styles.frameImage} />
+                    <ProtectedImage src={`${API_BASE_URL}${selectedRepSnapshot.image_path}`} alt={`Rep ${selectedRepSnapshot.rep_number} bottom frame`} style={styles.frameImage} />
                   ) : null}
                   {supportsKneeTracking && highlightedFrontSnapshot ? (
-                    <img src={`${API_BASE_URL}${highlightedFrontSnapshot.image_path}`} alt="Knee tracking frame" style={styles.frameImage} />
+                    <ProtectedImage src={`${API_BASE_URL}${highlightedFrontSnapshot.image_path}`} alt="Knee tracking frame" style={styles.frameImage} />
                   ) : null}
                   {!selectedRepSnapshot && !highlightedFrontSnapshot ? <div style={styles.videoPlaceholder}>No frame available</div> : null}
                   <div style={styles.frameCaption}>
@@ -1245,7 +1238,7 @@ function FormAnalysisTab({
               </div>
 
               {supportsRepDetection && repRows.length ? (
-                <div style={styles.tableWrapper}>
+                <div role="region" aria-label="Analysis measurements" tabIndex={0} style={styles.tableWrapper}>
                   <table style={styles.table}>
                     <thead>
                       <tr>
@@ -1462,53 +1455,19 @@ function AiPlanDraftForm({
 }
 
 function ApprovedPlanDetailsForm({ planKind, plan }: { planKind: PlanKind; plan: Plan }) {
-  const details = planToDraftState(plan);
-  return (
-    <div style={styles.form}>
-      <div style={styles.noticeBox}>
-        <strong>Approved plan</strong>
-        <span>This plan is final and view-only from this screen.</span>
-      </div>
-      <SectionEyebrow title="Plan window" />
-      <LabeledField label="Plan title"><input value={details.title} style={styles.input} disabled /></LabeledField>
-      <LabeledField label="Period type">
-        <select value={details.period_type} style={styles.input} disabled>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
-      </LabeledField>
-      <LabeledField label="Period start"><input type="date" value={details.period_start} style={styles.input} disabled /></LabeledField>
-      <LabeledField label="Period end"><input type="date" value={details.period_end} style={styles.input} disabled /></LabeledField>
-      <SectionEyebrow title="Coaching content" />
-      <LabeledField label="Primary focus"><input value={details.focus} style={styles.input} disabled /></LabeledField>
-      <LabeledField label="Summary"><textarea value={details.summary} style={styles.textarea} readOnly /></LabeledField>
-      {planKind === "nutrition" ? (
-        <LabeledField label="Meals or daily structure"><textarea value={details.meals} style={styles.textarea} readOnly /></LabeledField>
-      ) : (
-        <>
-          <LabeledField label="Training split or workout days"><textarea value={details.workout_days} style={styles.textarea} readOnly /></LabeledField>
-          <LabeledField label="Mobility drills"><textarea value={details.mobility_drills} style={styles.textarea} readOnly /></LabeledField>
-          <LabeledField label="Stretching plan"><textarea value={details.stretching_plan} style={styles.textarea} readOnly /></LabeledField>
-        </>
-      )}
-      <LabeledField label="Coach notes"><textarea value={details.notes} style={styles.textarea} readOnly /></LabeledField>
-    </div>
-  );
+  const details = planToDraftState(plan)
+  const sections = [
+    ['Primary focus', details.focus], ['Summary', details.summary],
+    ...(planKind === 'nutrition' ? [['Meals / daily structure', details.meals]] : [['Training days', details.workout_days], ['Mobility drills', details.mobility_drills], ['Stretching', details.stretching_plan]]),
+    ['Coach notes', details.notes],
+  ]
+  return <div className="plan-document"><StatusBadge tone="success">Approved · view only</StatusBadge><h3>{details.title}</h3><p>{details.period_type} plan · {details.period_start} to {details.period_end}</p>
+    {sections.map(([label, value]) => <section key={label}><h3>{label}</h3><p>{value || 'Not specified in this plan.'}</p></section>)}
+  </div>
 }
 
 function Drawer({ title, isOpen, onClose, children }: { title: string; isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
-  if (!isOpen) return null;
-  return (
-    <div style={styles.drawerBackdrop}>
-      <aside style={styles.drawer}>
-        <div style={styles.drawerHeader}>
-          <div style={styles.drawerTitle}>{title}</div>
-          <button type="button" style={styles.iconButton} onClick={onClose} aria-label="Close drawer"><X size={18} /></button>
-        </div>
-        {children}
-      </aside>
-    </div>
-  );
+  return <Dialog open={isOpen} title={title} onClose={onClose} drawer>{children}</Dialog>
 }
 
 type SectionAction = {
@@ -1535,7 +1494,7 @@ function SectionHeader({
 }) {
   const headerActions = actions ?? (actionLabel && onAction ? [{ label: actionLabel, onAction }] : []);
   return (
-    <div style={styles.panelHeader}>
+    <div className="flow-header" style={styles.panelHeader}>
       <div style={styles.panelTitleWrap}>
         {Icon ? <div style={styles.panelIcon}><Icon size={18} /></div> : null}
         <div>
@@ -1612,8 +1571,7 @@ function PdfLink({ href, label, onClick }: { href: string; label: string; onClic
       onClick={(event) => {
         onClick?.(event);
         event.preventDefault();
-        const token = getStoredAccessToken();
-        window.open(`${href}?token=${encodeURIComponent(token)}`, "_blank", "noopener,noreferrer");
+        void downloadProtected(href).catch(error => window.alert(error.message));
       }}
     >
       <FileText size={15} />
@@ -1623,29 +1581,11 @@ function PdfLink({ href, label, onClick }: { href: string; label: string; onClic
 }
 
 function PlanHistoryCard({ plan, getPdfUrl, onOpen }: { plan: Plan; getPdfUrl: (planId: number) => string; onOpen: (plan: Plan) => void }) {
-  return (
-    <div
-      style={styles.historyCardButton}
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(plan)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(plan);
-        }
-      }}
-    >
-      <div style={styles.historyTopRow}>
-        <div>
-          <div style={styles.historyTitle}>{plan.title}</div>
-          <div style={styles.historyMeta}>{plan.period_type} · {plan.period_start} to {plan.period_end}</div>
-        </div>
-        <PdfLink href={getPdfUrl(plan.id)} label="PDF" onClick={(event) => event.stopPropagation()} />
-      </div>
-      <div style={styles.historySummary}>{plan.content.summary || plan.content.focus || "No summary added."}</div>
-    </div>
-  );
+  return <article style={styles.historyCard}>
+    <div className="section-heading"><div><h3 style={styles.historyTitle}>{plan.title}</h3><p style={styles.historyMeta}>{plan.period_type} · {plan.period_start} to {plan.period_end}</p></div><PdfLink href={getPdfUrl(plan.id)} label="PDF" /></div>
+    <p style={styles.historySummary}>{plan.content.summary || plan.content.focus || 'No summary added.'}</p>
+    <button type="button" style={styles.secondaryButton} onClick={() => onOpen(plan)}>View plan<ClipboardList size={16} /></button>
+  </article>
 }
 
 function PlanDraftCard({ draft, onOpen }: { draft: PlanDraft; onOpen: () => void }) {
@@ -1671,7 +1611,7 @@ function renderDetailTab(
   onChange: React.Dispatch<React.SetStateAction<DetailTab>>
 ) {
   return (
-    <button type="button" style={activeTab === tab ? styles.detailTabActive : styles.detailTab} onClick={() => onChange(tab)}>
+    <button type="button" aria-pressed={activeTab === tab} style={activeTab === tab ? styles.detailTabActive : styles.detailTab} onClick={() => onChange(tab)}>
       <Icon size={16} />
       {label}
     </button>
@@ -1785,9 +1725,6 @@ function formatAnalysisStatus(status: string) {
   }
 }
 
-function formatTimelineType(timelineType: string) {
-  return timelineType === "monthly" ? "Monthly" : "Weekly";
-}
 
 function formatView(view?: string) {
   switch (view) {
@@ -1836,7 +1773,7 @@ function getCoachStatus(depthStatus?: string) {
 function getStatusBadgeStyle(status: string): React.CSSProperties {
   switch (status) {
     case "queued": return { ...styles.statusBadge, backgroundColor: THEME.colors.warningSurface, color: THEME.colors.warning };
-    case "running": return { ...styles.statusBadge, backgroundColor: THEME.colors.primaryMuted, color: THEME.colors.primary };
+    case "running": return { ...styles.statusBadge, backgroundColor: THEME.colors.primaryMuted, color: THEME.colors.primaryDeep };
     case "completed": return { ...styles.statusBadge, backgroundColor: THEME.colors.successSurface, color: THEME.colors.success };
     case "failed": return { ...styles.statusBadge, backgroundColor: THEME.colors.dangerSurface, color: THEME.colors.danger };
     default: return styles.statusBadge;
@@ -1844,52 +1781,40 @@ function getStatusBadgeStyle(status: string): React.CSSProperties {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", display: "flex", background: THEME.gradients.app },
-  main: { flex: 1, padding: 24, boxSizing: "border-box" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 24 },
-  headerActions: { display: "flex", gap: 12 },
   pageTitle: { margin: 0, fontSize: THEME.typography.pageTitle, color: THEME.colors.ink },
   pageSubtitle: { margin: "10px 0 0", color: THEME.colors.textSoft, lineHeight: 1.5 },
-  layout: { display: "grid", gridTemplateColumns: "280px 1fr", gap: 20, alignItems: "start" },
-  clientRail: { backgroundColor: "rgba(255,255,255,0.82)", border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.panel, padding: 16, boxShadow: THEME.shadows.card },
+  clientRail: { backgroundColor: THEME.colors.surface, border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.panel, padding: 16, boxShadow: THEME.shadows.card },
   workspace: { display: "flex", flexDirection: "column", gap: 20 },
-  panel: { backgroundColor: "rgba(255,255,255,0.88)", border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.panel, padding: 20, boxShadow: THEME.shadows.card },
+  panel: { backgroundColor: THEME.colors.surface, border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.panel, padding: 20, boxShadow: THEME.shadows.card },
   panelHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, marginBottom: 16 },
   headerButtonGroup: { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 },
   panelTitle: { fontSize: 18, fontWeight: 800, color: THEME.colors.text },
   panelTitleWrap: { display: "flex", alignItems: "center", gap: 10 },
   panelIcon: { width: 34, height: 34, borderRadius: THEME.radii.md, backgroundColor: THEME.colors.accentMuted, color: THEME.colors.accentDeep, display: "flex", alignItems: "center", justifyContent: "center" },
   panelText: { color: THEME.colors.textSoft, lineHeight: 1.6, margin: "8px 0 0" },
-  primaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px 14px", borderRadius: THEME.radii.sm, border: "none", backgroundColor: THEME.colors.indigo, color: THEME.colors.white, fontWeight: 700, cursor: "pointer", boxShadow: `0 10px 22px ${THEME.shadows.primarySoft}` },
-  secondaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: "rgba(255,255,255,0.78)", color: THEME.colors.primaryDeep, fontWeight: 700, cursor: "pointer" },
-  errorBox: { backgroundColor: THEME.colors.dangerSurface, color: THEME.colors.danger, border: "1px solid #fecaca", borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
-  successBox: { backgroundColor: THEME.colors.successSurface, color: "#166534", border: "1px solid #bbf7d0", borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
+  primaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px 14px", borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, fontWeight: 700, cursor: "pointer", boxShadow: `0 10px 22px ${THEME.shadows.primarySoft}` },
+  secondaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, color: THEME.colors.primaryDeep, fontWeight: 700, cursor: "pointer" },
+  errorBox: { backgroundColor: THEME.colors.dangerSurface, color: THEME.colors.danger, border: `1px solid ${THEME.colors.danger}`, borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
+  successBox: { backgroundColor: THEME.colors.successSurface, color: THEME.colors.success, border: `1px solid ${THEME.colors.success}`, borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
   clientList: { display: "flex", flexDirection: "column", gap: 10 },
-  clientCard: { width: "100%", padding: 12, borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, backgroundColor: THEME.colors.surface, textAlign: "left", cursor: "pointer", boxShadow: "0 4px 12px rgba(15,23,42,0.04)" },
+  clientCard: { width: "100%", padding: 12, borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, backgroundColor: THEME.colors.surface, textAlign: "left", cursor: "pointer", boxShadow: THEME.shadows.card },
   clientCardActive: { width: "100%", padding: 12, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, background: THEME.gradients.card, textAlign: "left", cursor: "pointer", boxShadow: THEME.shadows.card },
   clientName: { fontWeight: 800, color: THEME.colors.text },
   clientMeta: { marginTop: 6, color: THEME.colors.textMuted, fontSize: 13 },
   workspaceHeader: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", marginBottom: 18 },
-  detailTitle: { fontWeight: 800, fontSize: 24, color: THEME.colors.ink },
-  detailTabRow: { display: "flex", gap: 10, flexWrap: "wrap" },
-  detailTab: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: "rgba(255,255,255,0.82)", color: THEME.colors.textSoft, cursor: "pointer", fontWeight: 700 },
-  detailTabActive: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: PRIMARY_BORDER, backgroundColor: THEME.colors.indigo, color: THEME.colors.white, cursor: "pointer", fontWeight: 700 },
-  twoColumnGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 },
+  detailTitle: { margin: 0, fontWeight: 800, fontSize: 24, color: THEME.colors.ink },
+  detailTab: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, color: THEME.colors.textSoft, cursor: "pointer", fontWeight: 700 },
+  detailTabActive: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: PRIMARY_BORDER, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, cursor: "pointer", fontWeight: 700 },
   snapshotGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   snapshotRow: { color: THEME.colors.textSoft, lineHeight: 1.5 },
   snapshotLabel: { display: "block", color: THEME.colors.textMuted, fontSize: 12, fontWeight: 800, marginBottom: 3 },
-  goalTitle: { fontSize: 22, fontWeight: 800, color: THEME.colors.primary },
+  goalTitle: { fontSize: 22, fontWeight: 800, color: THEME.colors.primaryDeep },
   emptyState: { display: "flex", alignItems: "flex-start", gap: 12, color: THEME.colors.textSoft, lineHeight: 1.5 },
   emptyIcon: { width: 36, height: 36, borderRadius: THEME.radii.md, backgroundColor: THEME.colors.energyMuted, color: THEME.colors.accentDeep, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   emptyTitle: { fontWeight: 800, fontSize: 18, color: THEME.colors.text, marginBottom: 6 },
   emptyText: { color: THEME.colors.textMuted },
-  progressTimeline: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 },
-  progressCard: { borderRadius: THEME.radii.sm, overflow: "hidden", border: `1px solid ${THEME.colors.border}`, backgroundColor: THEME.colors.surfaceMuted },
-  progressImage: { width: "100%", aspectRatio: "4 / 5", objectFit: "cover", display: "block", backgroundColor: THEME.colors.border },
-  progressBody: { padding: 14 },
   historyList: { display: "flex", flexDirection: "column", gap: 12 },
-  historyCard: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted },
-  historyCardButton: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted, cursor: "pointer" },
   draftCardButton: { width: "100%", marginTop: 12, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },
   historyButton: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, padding: 14, backgroundColor: THEME.colors.surfaceMuted, textAlign: "left", cursor: "pointer" },
   historyButtonActive: { borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, padding: 14, background: THEME.gradients.card, textAlign: "left", cursor: "pointer" },
@@ -1897,7 +1822,7 @@ const styles: Record<string, React.CSSProperties> = {
   historyTitle: { fontWeight: 800, color: THEME.colors.text },
   historyMeta: { color: THEME.colors.textMuted, fontSize: 13, marginTop: 4 },
   historySummary: { color: THEME.colors.textSoft, marginTop: 10, lineHeight: 1.5, whiteSpace: "pre-wrap" },
-  linkButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", borderRadius: THEME.radii.sm, backgroundColor: THEME.colors.indigo, color: THEME.colors.white, textDecoration: "none", fontSize: 14, fontWeight: 700 },
+  linkButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", borderRadius: THEME.radii.sm, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, textDecoration: "none", fontSize: 14, fontWeight: 700 },
   fieldGroup: { display: "flex", flexDirection: "column", gap: 6 },
   fieldLabel: { color: THEME.colors.text, fontSize: 13, fontWeight: 800 },
   helperText: { color: THEME.colors.textMuted, fontSize: 12, lineHeight: 1.4 },
@@ -1907,21 +1832,14 @@ const styles: Record<string, React.CSSProperties> = {
   form: { display: "flex", flexDirection: "column", gap: 14 },
   noticeBox: { display: "flex", flexDirection: "column", gap: 4, borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.primaryMuted, color: THEME.colors.primaryDeep, padding: 14, lineHeight: 1.5 },
   checkboxRow: { display: "flex", alignItems: "center", gap: 8, color: THEME.colors.textSoft, fontWeight: 700 },
-  sectionEyebrow: { marginTop: 4, paddingTop: 4, color: THEME.colors.primary, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0 },
-  drawerBackdrop: { position: "fixed", inset: 0, backgroundColor: "rgba(15,23,42,0.32)", display: "flex", justifyContent: "flex-end", zIndex: 20 },
-  drawer: { width: 440, maxWidth: "100vw", minHeight: "100vh", overflowY: "auto", background: THEME.gradients.app, padding: 24, boxSizing: "border-box", boxShadow: THEME.shadows.drawer },
-  drawerHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  drawerTitle: { fontSize: 22, fontWeight: 800, color: THEME.colors.text },
-  iconButton: { width: 36, height: 36, borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
-  formAnalysisGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1.8fr) minmax(300px, 0.9fr)", gap: 20, alignItems: "start" },
+  sectionEyebrow: { marginTop: 4, paddingTop: 4, color: THEME.colors.primaryDeep, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0 },
   analysisMain: { display: "flex", flexDirection: "column", gap: 20 },
   analysisAside: { position: "sticky", top: 20 },
   jobStatusCard: { borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.border}`, backgroundColor: THEME.colors.surfaceMuted, padding: 14 },
-  heroSection: { display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16 },
-  videoFrame: { backgroundColor: "#020617", color: THEME.colors.white, borderRadius: THEME.radii.sm, padding: 14 },
-  frameImage: { width: "100%", maxHeight: 320, objectFit: "contain", display: "block", borderRadius: THEME.radii.sm, backgroundColor: "#111827" },
-  videoPlaceholder: { minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: THEME.radii.sm },
-  frameCaption: { marginTop: 12, color: "#cbd5e1", fontSize: 13, lineHeight: 1.5 },
+  videoFrame: { backgroundColor: THEME.colors.navy, color: THEME.colors.white, borderRadius: THEME.radii.sm, padding: 14 },
+  frameImage: { width: "100%", maxHeight: 320, objectFit: "contain", display: "block", borderRadius: THEME.radii.sm, backgroundColor: THEME.colors.navy },
+  videoPlaceholder: { minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center", color: THEME.colors.mutedDark, backgroundColor: THEME.colors.navy, borderRadius: THEME.radii.sm },
+  frameCaption: { marginTop: 12, color: THEME.colors.mutedDark, fontSize: 13, lineHeight: 1.5 },
   summaryColumn: { display: "flex", flexDirection: "column", gap: 12 },
   metricCard: { backgroundColor: THEME.colors.surfaceMuted, border: `1px solid ${THEME.colors.border}`, borderRadius: THEME.radii.sm, padding: 14 },
   metricLabel: { fontSize: 12, color: THEME.colors.textMuted, fontWeight: 800, marginBottom: 8 },
@@ -1929,13 +1847,13 @@ const styles: Record<string, React.CSSProperties> = {
   tableWrapper: { overflowX: "auto", marginTop: 16 },
   table: { width: "100%", borderCollapse: "collapse" },
   th: { textAlign: "left", fontSize: 13, color: THEME.colors.textMuted, fontWeight: 800, padding: "12px 8px", borderBottom: `1px solid ${THEME.colors.border}` },
-  td: { padding: "12px 8px", borderBottom: "1px solid #f1f5f9", fontSize: 14, color: THEME.colors.textSoft },
-  tdStrong: { padding: "12px 8px", borderBottom: "1px solid #f1f5f9", fontSize: 14, fontWeight: 800, color: THEME.colors.text },
+  td: { padding: "12px 8px", borderBottom: `1px solid ${THEME.colors.surfaceMuted}`, fontSize: 14, color: THEME.colors.textSoft },
+  tdStrong: { padding: "12px 8px", borderBottom: `1px solid ${THEME.colors.surfaceMuted}`, fontSize: 14, fontWeight: 800, color: THEME.colors.text },
   selectedRow: { backgroundColor: THEME.colors.surfaceMuted },
   smallButton: { padding: "8px 10px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, cursor: "pointer" },
-  smallButtonActive: { padding: "8px 10px", borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.primary, color: THEME.colors.white, cursor: "pointer" },
+  smallButtonActive: { padding: "8px 10px", borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.primary, color: THEME.colors.onBrand, cursor: "pointer" },
   infoCard: { backgroundColor: THEME.colors.surfaceMuted, borderRadius: THEME.radii.sm, padding: 14, marginTop: 12, color: THEME.colors.textSoft, lineHeight: 1.6 },
-  infoTitle: { fontWeight: 800, marginBottom: 6, color: THEME.colors.primary },
-  actionRow: { display: "flex", gap: 12, alignItems: "center", marginTop: 14 },
-  statusBadge: { borderRadius: THEME.radii.pill, padding: "6px 10px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" },
+  infoTitle: { fontWeight: 800, marginBottom: 6, color: THEME.colors.primaryDeep },
+  actionRow: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginTop: 14 },
+  statusBadge: { borderRadius: THEME.radii.pill, padding: "6px 10px", fontSize: 12, fontWeight: 800, overflowWrap: "anywhere" },
 };

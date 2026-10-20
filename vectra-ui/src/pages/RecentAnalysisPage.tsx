@@ -1,6 +1,7 @@
+import { Skeleton } from '../design-system/components'
+import ProtectedImage from '../components/ProtectedImage'
 import React, { useEffect, useState } from "react";
 import { ClipboardList, RefreshCw } from "lucide-react";
-import SideNav from "../components/SideNav";
 import { API_BASE_URL } from "../services/apiConfig";
 import { listSquatJobs } from "../services/squatApi";
 import type { AppTab } from "../types/navigation";
@@ -16,9 +17,6 @@ type RecentAnalysisPageProps = {
 };
 
 export default function RecentAnalysisPage({
-  activeTab,
-  onTabChange,
-  onLogout,
   onOpenAnalysis,
   selectedJobId,
 }: RecentAnalysisPageProps) {
@@ -46,19 +44,10 @@ export default function RecentAnalysisPage({
   }, []);
 
   return (
-    <div style={styles.page}>
-      <SideNav activeTab={activeTab} onTabChange={onTabChange} subtitle="Trainer Workspace">
-        <div style={styles.infoCard}>
-          <div style={styles.infoTitle}>Review library</div>
-          <div style={styles.infoText}>
-            Browse recent squat analyses, inspect annotated thumbnails, and reopen any
-            session in its client workspace.
-          </div>
-        </div>
-      </SideNav>
+    <div>
 
-      <main style={styles.main}>
-        <div style={styles.header}>
+      <main className="page-content">
+        <div className="flow-header" style={styles.header}>
         <div>
           <h1 style={styles.pageTitle}>Recent Analysis</h1>
           <p style={styles.pageSubtitle}>
@@ -66,8 +55,7 @@ export default function RecentAnalysisPage({
           </p>
         </div>
 
-        <div style={styles.headerActions}>
-          <button style={styles.secondaryButton} onClick={onLogout}>Logout</button>
+        <div className="header-actions">
           <button style={styles.refreshButton} onClick={loadJobs} disabled={isLoading}>
             <RefreshCw size={16} />
             {isLoading ? "Refreshing..." : "Refresh list"}
@@ -75,7 +63,7 @@ export default function RecentAnalysisPage({
         </div>
       </div>
 
-        {error ? <div style={styles.errorBox}>{error}</div> : null}
+        {error ? <div role="alert" style={styles.errorBox}>{error}</div> : null}
 
         {!jobs.length && !isLoading ? (
           <div style={styles.emptyState}>
@@ -88,6 +76,7 @@ export default function RecentAnalysisPage({
           </div>
         ) : null}
 
+        {isLoading && <Skeleton label="Loading analysis history…" />}
         <div style={styles.grid}>
           {jobs.map((job) => {
             const thumbnailPath = getThumbnailPath(job);
@@ -101,7 +90,7 @@ export default function RecentAnalysisPage({
               >
                 <div style={styles.thumbnailFrame}>
                   {thumbnailPath ? (
-                    <img
+                    <ProtectedImage
                       src={`${API_BASE_URL}${thumbnailPath}`}
                       alt={`${job.original_filename} annotated frame`}
                       style={styles.thumbnailImage}
@@ -208,26 +197,26 @@ function getJobBadgeStyle(status: string): React.CSSProperties {
     case "queued":
       return {
         ...styles.badge,
-        backgroundColor: "#fff7ed",
-        color: "#c2410c",
+        backgroundColor: THEME.colors.warningSurface,
+        color: THEME.colors.warning,
       };
     case "running":
       return {
         ...styles.badge,
-        backgroundColor: "#eff6ff",
-        color: "#1d4ed8",
+        backgroundColor: THEME.colors.infoSurface,
+        color: THEME.colors.info,
       };
     case "completed":
       return {
         ...styles.badge,
-        backgroundColor: "#ecfdf5",
-        color: "#047857",
+        backgroundColor: THEME.colors.successSurface,
+        color: THEME.colors.success,
       };
     case "failed":
       return {
         ...styles.badge,
-        backgroundColor: "#fef2f2",
-        color: "#b91c1c",
+        backgroundColor: THEME.colors.dangerSurface,
+        color: THEME.colors.danger,
       };
     default:
       return styles.badge;
@@ -235,88 +224,6 @@ function getJobBadgeStyle(status: string): React.CSSProperties {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    background: THEME.gradients.app,
-  },
-  sidebar: {
-    width: "280px",
-    backgroundColor: "#ffffff",
-    borderRight: "1px solid #e2e8f0",
-    padding: "20px",
-    boxSizing: "border-box",
-  },
-  brandRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  brandIcon: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "14px",
-    backgroundColor: THEME.colors.primary,
-    color: THEME.colors.white,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 700,
-  },
-  brandTitle: {
-    fontSize: "18px",
-    fontWeight: 700,
-  },
-  brandSubtitle: {
-    fontSize: "12px",
-    color: "#64748b",
-  },
-  infoCard: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    color: THEME.colors.white,
-    borderRadius: THEME.radii.md,
-    padding: "16px",
-    border: `1px solid rgba(37,99,235,0.24)`,
-  },
-  infoTitle: {
-    fontSize: "14px",
-    fontWeight: 700,
-    marginBottom: "8px",
-  },
-  infoText: {
-    fontSize: "12px",
-    color: "#cbd5e1",
-    lineHeight: 1.6,
-  },
-  navSection: {
-    marginTop: "24px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  navItemActive: {
-    padding: "10px 12px",
-    borderRadius: "12px",
-    backgroundColor: "#f1f5f9",
-    fontWeight: 600,
-    border: "none",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  navItem: {
-    padding: "10px 12px",
-    borderRadius: "12px",
-    color: "#64748b",
-    border: "none",
-    backgroundColor: "transparent",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  main: {
-    flex: 1,
-    padding: "24px",
-    boxSizing: "border-box",
-  },
   header: {
     display: "flex",
     alignItems: "center",
@@ -332,7 +239,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pageSubtitle: {
     margin: "8px 0 0 0",
-    color: "#64748b",
+    color: THEME.colors.textMuted,
   },
   refreshButton: {
     display: "inline-flex",
@@ -340,33 +247,17 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "8px",
     padding: "10px 14px",
     borderRadius: "12px",
-    border: "1px solid #cbd5e1",
-    backgroundColor: "rgba(255,255,255,0.82)",
-    color: THEME.colors.primaryDeep,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  headerActions: {
-    display: "flex",
-    gap: "12px",
-  },
-  secondaryButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "10px 14px",
-    borderRadius: "12px",
-    border: "1px solid #cbd5e1",
-    backgroundColor: "rgba(255,255,255,0.82)",
+    border: `1px solid ${THEME.colors.borderStrong}`,
+    backgroundColor: THEME.colors.surface,
     color: THEME.colors.primaryDeep,
     fontWeight: 600,
     cursor: "pointer",
   },
   errorBox: {
     marginBottom: "18px",
-    backgroundColor: "#fef2f2",
-    color: "#b91c1c",
-    border: "1px solid #fecaca",
+    backgroundColor: THEME.colors.dangerSurface,
+    color: THEME.colors.danger,
+    border: `1px solid ${THEME.colors.danger}`,
     borderRadius: "14px",
     padding: "14px 16px",
   },
@@ -374,8 +265,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "flex-start",
     gap: "12px",
-    backgroundColor: "rgba(255,255,255,0.86)",
-    border: "1px solid #e2e8f0",
+    backgroundColor: THEME.colors.surface,
+    border: `1px solid ${THEME.colors.border}`,
     borderRadius: "24px",
     padding: "32px",
     marginBottom: "20px",
@@ -386,7 +277,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "8px",
   },
   emptyText: {
-    color: "#64748b",
+    color: THEME.colors.textMuted,
   },
   emptyIcon: {
     width: "40px",
@@ -401,12 +292,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
     gap: "20px",
   },
   analysisCard: {
-    border: "1px solid #e2e8f0",
-    backgroundColor: "rgba(255,255,255,0.88)",
+    border: `1px solid ${THEME.colors.border}`,
+    backgroundColor: THEME.colors.surface,
     borderRadius: "22px",
     padding: "14px",
     cursor: "pointer",
@@ -414,7 +305,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: THEME.shadows.card,
   },
   analysisCardActive: {
-    border: "1px solid #93c5fd",
+    border: `1px solid ${THEME.colors.borderStrong}`,
     background: THEME.gradients.card,
     borderRadius: "22px",
     padding: "14px",
@@ -426,7 +317,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     aspectRatio: "16 / 10",
     borderRadius: "18px",
-    backgroundColor: "#e2e8f0",
+    backgroundColor: THEME.colors.border,
     overflow: "hidden",
     marginBottom: "14px",
   },
@@ -442,11 +333,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#475569",
+    color: THEME.colors.textSoft,
     fontSize: "13px",
     fontWeight: 600,
     background:
-      "linear-gradient(135deg, rgba(226,232,240,1) 0%, rgba(203,213,225,1) 100%)",
+      THEME.colors.surfaceMuted,
   },
   cardTopRow: {
     display: "flex",
@@ -458,17 +349,17 @@ const styles: Record<string, React.CSSProperties> = {
   filename: {
     fontSize: "14px",
     fontWeight: 700,
-    color: THEME.colors.primary,
+    color: THEME.colors.primaryDeep,
     wordBreak: "break-word",
   },
   metaRow: {
     fontSize: "12px",
-    color: "#64748b",
+    color: THEME.colors.textMuted,
     marginBottom: "8px",
   },
   summaryText: {
     fontSize: "13px",
-    color: "#334155",
+    color: THEME.colors.text,
     lineHeight: 1.5,
   },
   badge: {
@@ -476,6 +367,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "6px 10px",
     fontSize: "12px",
     fontWeight: 700,
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
   },
 };

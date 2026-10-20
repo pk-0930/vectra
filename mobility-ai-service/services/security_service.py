@@ -22,8 +22,8 @@ def _b64_decode(data: str) -> bytes:
 
 
 class SecurityService:
-    def __init__(self):
-        self.config = get_auth_config()
+    def __init__(self, config=None):
+        self.config = config if config is not None else get_auth_config()
 
     def hash_password(self, password: str) -> str:
         salt = secrets.token_hex(16)
@@ -53,10 +53,11 @@ class SecurityService:
         )
         return hmac.compare_digest(digest.hex(), expected_hash)
 
-    def create_access_token(self, *, user_id: int, email: str) -> str:
+    def create_access_token(self, *, user_id: int, email: str, session_version: int = 0) -> str:
         expires_at = utc_now() + timedelta(hours=self.config.token_expiration_hours)
         payload = {
             "sub": user_id,
+            "ver": session_version,
             "email": email,
             "exp": expires_at.isoformat(),
         }
@@ -70,6 +71,8 @@ class SecurityService:
 
     def decode_access_token(self, token: str) -> dict | None:
         try:
+            if not isinstance(token, str) or len(token) > 8192:
+                return None
             encoded_payload, encoded_signature = token.split(".", 1)
             payload_bytes = _b64_decode(encoded_payload)
             expected_signature = hmac.new(
@@ -82,7 +85,12 @@ class SecurityService:
                 return None
 
             payload = json.loads(payload_bytes.decode("utf-8"))
-            if utc_now() >= datetime.fromisoformat(payload["exp"]):
+            if not isinstance(payload, dict):
+                return None
+            if type(payload.get("sub")) is not int or not 0 < payload["sub"] <= 9223372036854775807:
+                return None
+            expiry = datetime.fromisoformat(payload["exp"])
+            if expiry.tzinfo is None or utc_now() >= expiry:
                 return None
             return payload
         except Exception:

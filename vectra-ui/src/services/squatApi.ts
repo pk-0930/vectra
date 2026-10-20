@@ -1,3 +1,4 @@
+import { features } from './features'
 import { API_BASE_URL } from "./apiConfig";
 import type { SquatJobListResponse, SquatJobResponse } from "../types/squat";
 import { buildAuthHeaders } from "./session";
@@ -5,6 +6,7 @@ import { buildAuthHeaders } from "./session";
 const FORM_ANALYSIS_ENDPOINT = `${API_BASE_URL}/form-analyses`;
 
 export async function createSquatJob(file: File, clientId: number): Promise<SquatJobResponse> {
+  if (!features.formAnalysis) throw new Error("Form analysis is disabled.");
   const formData = new FormData();
   formData.append("file", file);
 
@@ -25,6 +27,7 @@ export async function createSquatJob(file: File, clientId: number): Promise<Squa
 }
 
 export async function fetchSquatJob(jobId: string): Promise<SquatJobResponse> {
+  if (!features.formAnalysis) throw new Error("Form analysis is disabled.");
   const response = await fetch(`${FORM_ANALYSIS_ENDPOINT}/${jobId}`, {
     headers: buildAuthHeaders(),
   });
@@ -40,6 +43,7 @@ export async function fetchSquatJob(jobId: string): Promise<SquatJobResponse> {
 }
 
 export async function listSquatJobs(limit = 12): Promise<SquatJobListResponse> {
+  if (!features.formAnalysis) return { analyses: [] };
   const response = await fetch(`${FORM_ANALYSIS_ENDPOINT}?limit=${limit}`, {
     headers: buildAuthHeaders(),
   });
@@ -55,6 +59,7 @@ export async function listSquatJobs(limit = 12): Promise<SquatJobListResponse> {
 }
 
 export async function listClientSquatJobs(clientId: number, limit = 12): Promise<SquatJobListResponse> {
+  if (!features.formAnalysis) return { analyses: [] };
   const response = await fetch(`${API_BASE_URL}/clients/${clientId}/form-analyses?limit=${limit}`, {
     headers: buildAuthHeaders(),
   });
@@ -70,6 +75,7 @@ export async function listClientSquatJobs(clientId: number, limit = 12): Promise
 }
 
 export async function saveAnalysisFeedback(jobId: string, coachFeedbackNote: string): Promise<SquatJobResponse> {
+  if (!features.formAnalysis) throw new Error("Form analysis is disabled.");
   const response = await fetch(`${FORM_ANALYSIS_ENDPOINT}/${jobId}/feedback`, {
     method: "PUT",
     headers: buildAuthHeaders({

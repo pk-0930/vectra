@@ -14,6 +14,10 @@ class JobService:
     def __init__(self, repository=None):
         self.repository = repository or PostgresPlatformRepository(get_postgres_config())
 
+    def for_organization(self, organization_id):
+        from repositories.worker_repository import WorkerRepository
+        return JobService(WorkerRepository(self.repository.config, organization_id))
+
     def create_job(
         self,
         *,

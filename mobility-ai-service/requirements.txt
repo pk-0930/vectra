@@ -1,4 +1,4 @@
-fastapi
+fastapi>=0.135.3
 uvicorn
 opencv-python
 mediapipe
@@ -8,3 +8,7 @@ azure-functions
 azure-storage-blob
 azure-storage-queue
 psycopg[binary]
+azure-communication-email>=1.1.0,<2
+requests>=2.32.0,<3
+qrcode[pil]>=8,<9
+reportlab>=4,<5

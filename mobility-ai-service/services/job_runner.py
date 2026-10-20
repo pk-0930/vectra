@@ -68,8 +68,20 @@ class JobRunner:
 
             self.blob_storage_service.upload_annotated_frames(
                 source_directory=annotated_frames_dir,
-                blob_prefix="",
+                blob_prefix=f"{job_id}",
             )
+
+            def scope_frames(value):
+                if isinstance(value, dict):
+                    for key, item in value.items():
+                        if key == "image_path" and isinstance(item, str) and item.startswith("/frames/"):
+                            value[key] = f"/frames/{job_id}/{item.removeprefix('/frames/').split('?', 1)[0]}"
+                        else:
+                            scope_frames(item)
+                elif isinstance(value, list):
+                    for item in value:
+                        scope_frames(item)
+            scope_frames(squat_report)
 
             return {
                 "status": "Video processed",

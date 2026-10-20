@@ -1,6 +1,6 @@
 import type { Client, ClientPayload, Goal, GoalPayload, ProgressPhoto } from "../types/client";
 import { API_BASE_URL } from "./apiConfig";
-import { buildAuthHeaders, getStoredAccessToken } from "./session";
+import { buildAuthHeaders } from "./session";
 
 export async function listClients(): Promise<Client[]> {
   const response = await fetch(`${API_BASE_URL}/clients`, {
@@ -125,6 +125,5 @@ export async function uploadClientProgressPhoto(
 }
 
 export function getClientProgressPhotoUrl(blobName: string) {
-  const token = getStoredAccessToken();
-  return `${API_BASE_URL}/client-progress-photos/${blobName}?token=${encodeURIComponent(token)}`;
+  return `${API_BASE_URL}/client-progress-photos/${blobName}`;
 }

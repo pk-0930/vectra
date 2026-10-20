@@ -23,9 +23,10 @@ class QueueService:
         except Exception:
             pass
 
-    def enqueue_analysis_job(self, *, job_id: str, analysis_type: str):
+    def enqueue_analysis_job(self, *, job_id: str, analysis_type: str, organization_id: int):
         self.repository.send_message(
             {
+                "organization_id": organization_id,
                 "job_id": job_id,
                 "analysis_id": job_id,
                 "analysis_type": analysis_type,

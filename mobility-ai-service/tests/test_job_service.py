@@ -82,7 +82,9 @@ class InMemoryJobRepository:
 
 class JobServiceTests(unittest.TestCase):
     def build_store(self) -> JobService:
-        return JobService(repository=InMemoryJobRepository())
+        store = JobService(repository=InMemoryJobRepository())
+        store.for_organization = Mock(return_value=store)
+        return store
 
     def test_job_lifecycle_moves_from_queued_to_completed(self):
         store = self.build_store()
@@ -126,7 +128,7 @@ class JobServiceTests(unittest.TestCase):
             processed = process_queue_message(
                 store,
                 Mock(run_squat_job=Mock(return_value={"status": "Video processed", "filename": "demo.mp4"})),
-                {"job_id": "job-2", "analysis_type": "squat"},
+                {"job_id": "job-2", "analysis_type": "squat", "organization_id": 1},
             )
 
         self.assertTrue(processed)
@@ -148,7 +150,7 @@ class JobServiceTests(unittest.TestCase):
             process_queue_message(
                 store,
                 Mock(run_squat_job=Mock(side_effect=RuntimeError("processing failed"))),
-                {"job_id": "job-3", "analysis_type": "squat"},
+                {"job_id": "job-3", "analysis_type": "squat", "organization_id": 1},
             )
 
         job = store.get_job("job-3")
@@ -216,7 +218,7 @@ class JobServiceTests(unittest.TestCase):
         processed = process_queue_message(
             store,
             Mock(run_squat_job=Mock()),
-            {"job_id": "job-4", "analysis_type": "squat"},
+            {"job_id": "job-4", "analysis_type": "squat", "organization_id": 1},
         )
 
         self.assertTrue(processed)

@@ -11,7 +11,7 @@ from repositories.access_repository import AccessDenied, ResourceNotFound, Acces
 from repositories.membership_repository import MembershipRepository
 from repositories.pt_repository import PtRepository
 from services.membership_service import MembershipService, today_india
-from services.pt_service import PtService, coverage_end
+from services.pt_service import INDIA, PtService, coverage_end
 
 
 @unittest.skipUnless(foundations.ENABLED, 'Set VECTRA_RUN_MIGRATION_TESTS=1')
@@ -129,7 +129,8 @@ class PtTests(foundations.DisposablePostgresTests):
     def test_overlap_duration_daily_limit_and_gym_expiry(self):
         first = self.pt_purchase(); self.pay(first)
         other = self.paid_member(); second = self.pt_purchase(other); self.pay(second)
-        when = datetime.now(timezone.utc)+timedelta(days=1)
+        tomorrow = datetime.now(INDIA).date()+timedelta(days=1)
+        when = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 10, tzinfo=INDIA)
         self.book(first, when=when)
         with self.assertRaises(ValueError): self.book(second, user=other, when=when+timedelta(minutes=30))
         with self.assertRaises(ValueError): self.book(first, when=when+timedelta(hours=3))

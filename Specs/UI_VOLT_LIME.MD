@@ -1,5 +1,13 @@
 # Vectra Performance OS — Design System & UI Implementation Specification v1.0
 
+## Current direction: Volt Performance Light (2026-10-29)
+
+This light-gradient direction supersedes earlier dark-panel and saturated-lime guidance below wherever they conflict. Vectra should feel like premium business software with an athletic identity: use a `#FAFBFC` application canvas, white navigation and data surfaces, readable Inter typography, and lime selectively. Sidebar selection and primary buttons share a near-black (`#172022`) fill with white text and icons; inactive navigation remains white. Secondary buttons use a white neutral surface, and tertiary buttons remain transparent. Keep forms, tables, and most metric cards on solid neutral surfaces.
+
+The centralized web tokens in `vectra-ui/src/design-system/tokens.ts` define the semantic `--gradient-hero`, `--gradient-pearl`, `--gradient-surface`, `--gradient-sage`, and `--gradient-brand` surfaces. Use hero for selected overview/onboarding callouts; surface for occasional summaries; sage for occasional featured insights; reserve brand gradient for exceptional branded/high-priority surfaces. Regular primary buttons use solid near-black component tokens, and secondary buttons remain white with a neutral border. Never gradient-fill the full page, sidebar, fields, or dense data regions. Pair pale gradients with dark text and preserve clear borders and readable contrast.
+
+Use subtle card elevation (`0 2px 8px rgba(23, 32, 34, 0.03)`), hover elevation (`0 6px 18px rgba(23, 32, 34, 0.06)`), and elevated surfaces (`0 12px 32px rgba(23, 32, 34, 0.08)`). Use consistent radii and restrained borders. Keep condensed display typography to occasional editorial or promotional headings; use the regular UI sans-serif for business data and metrics. The overview coaching focus is the first featured light-gradient surface; metric cards remain white.
+
 ## 1. Project Objective
 
 Redesign the existing Vectra React web application into a premium, athletic, fast-paced fitness management platform.

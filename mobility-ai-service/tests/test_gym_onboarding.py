@@ -6,9 +6,10 @@ from uuid import uuid4
 import cv2
 import numpy as np
 from PIL import Image
-from services.gym_service import clean_image, validate_config, DEFAULT_CONFIG
+from services.gym_service import GymService, clean_image, validate_config, DEFAULT_CONFIG
 from services.gym_registration_media import registration_qr, reception_poster
 from services.identity_service import IdentityService
+from repositories.access_repository import AccessDenied
 
 
 def configuration():
@@ -22,6 +23,67 @@ def configuration():
 
 
 class GymValidationTests(TestCase):
+    def test_owner_can_edit_and_confirm_payment_destination(self):
+        repo = MagicMock()
+        old = configuration()
+        new = copy.deepcopy(old)
+        new['payment'] = {'recipient_name': 'New Gym', 'upi_id': 'new@bank', 'qr_asset_id': str(uuid4())}
+        row = {'revision': 0, 'configuration': old, 'public_id': str(uuid4())}
+        repo.ensure_profile.return_value = row
+        repo.profile.return_value = row
+        repo.trainers.return_value = []
+        repo.asset_matches.return_value = True
+        access = MagicMock()
+        access.roles = {'owner'}
+        access.context = {'organization_type': 'gym'}
+        access.organization_id = 1
+        access.user_id = 2
+        access.connection = object()
+        service = GymService(repo, MagicMock())
+        service.save(access, 0, new, True)
+        repo.save_profile.assert_called_once()
+        self.assertEqual(repo.save_profile.call_args.args[4]['payment'], new['payment'])
+
+    def test_admin_cannot_change_payment_destination(self):
+        repo = MagicMock()
+        old = configuration()
+        new = copy.deepcopy(old)
+        new['payment'] = {'recipient_name': 'New Gym', 'upi_id': 'new@bank', 'qr_asset_id': str(uuid4())}
+        repo.ensure_profile.return_value = {'revision': 0, 'configuration': old, 'public_id': str(uuid4())}
+        access = MagicMock()
+        access.roles = {'admin'}
+        access.context = {'organization_type': 'gym'}
+        access.organization_id = 1
+        access.connection = object()
+        with self.assertRaises(AccessDenied):
+            GymService(repo, MagicMock()).save(access, 0, new, True)
+        repo.save_profile.assert_not_called()
+
+    def test_owner_can_upload_payment_qr(self):
+        repo = MagicMock()
+        access = MagicMock()
+        access.roles = {'owner'}
+        access.context = {'organization_type': 'gym'}
+        access.organization_id = 1
+        access.user_id = 2
+        access.connection = object()
+        repo.recent_upload_count.return_value = 0
+        source = BytesIO(); Image.new('RGB', (100, 100), 'white').save(source, 'PNG')
+        result = GymService(repo, MagicMock()).upload(access, 'payment_qr', source.getvalue())
+        self.assertIn('id', result)
+        repo.insert_asset.assert_called_once()
+
+    def test_admin_cannot_upload_payment_qr(self):
+        repo = MagicMock()
+        access = MagicMock()
+        access.roles = {'admin'}
+        access.context = {'organization_type': 'gym'}
+        access.organization_id = 1
+        source = BytesIO(); Image.new('RGB', (100, 100), 'white').save(source, 'PNG')
+        with self.assertRaises(AccessDenied):
+            GymService(repo, MagicMock()).upload(access, 'payment_qr', source.getvalue())
+        repo.insert_asset.assert_not_called()
+
     def test_plan_prices_are_integer_paise_and_duration_is_fixed(self):
         config = configuration()
         self.assertEqual(validate_config(config)['plans'][0]['amount_paise'], 12345)
@@ -44,11 +106,15 @@ class GymValidationTests(TestCase):
 
     def test_publication_requires_payment_and_active_gym_plan(self):
         config = configuration(); config['registration_enabled'] = True
-        with self.assertRaises(ValueError): validate_config(config)
+        config['plans'][0]['active'] = False
+        with self.assertRaisesRegex(ValueError, 'active gym membership plan.*payment recipient name.*payment UPI ID.*uploaded payment QR'):
+            validate_config(config)
+        config['plans'][0]['active'] = True
         config['payment'] = {'recipient_name': 'Gym', 'upi_id': 'gym@bank', 'qr_asset_id': str(uuid4())}
         self.assertTrue(validate_config(config)['registration_enabled'])
         config['plans'][0]['active'] = False
-        with self.assertRaises(ValueError): validate_config(config)
+        with self.assertRaisesRegex(ValueError, 'active gym membership plan'):
+            validate_config(config)
 
     def test_duplicate_ids_and_invalid_upi_rejected(self):
         config = configuration(); config['plans'] *= 2

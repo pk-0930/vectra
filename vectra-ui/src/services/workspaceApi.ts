@@ -1,10 +1,12 @@
 import { gymRequest, jsonRequest } from './gymApi'
 import type { Goal } from '../types/client'
+import type { GymPurchase } from './gymApi'
 export type InboxItem = { id: number; subject: string; message: string; created_at: string; read_at: string | null }
 export type Inbox = { items: InboxItem[]; unread: number; next_before: number | null }
 export type Report = {
   start: string; end: string; as_of: string; purchases_enabled: boolean
   collections: { method: string; payments: number; amount_paise: number }[]
+  transactions: GymPurchase[]
   refunds: { verified_collection: boolean; refunds: number; amount_paise: number }[]
   memberships: { active_members: number; expiring_members: number }
   pt_purchases: { status: string; purchases: number; amount_paise: number }[]

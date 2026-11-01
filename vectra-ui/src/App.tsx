@@ -22,13 +22,14 @@ import MemberPage from './pages/MemberPage'
 import AccessPage from './pages/AccessPage'
 import BillingGate from './components/BillingGate'
 import BusinessOnboardingPage from './pages/BusinessOnboardingPage'
+import BillingPage from './pages/BillingPage'
+import type { BillingSummary } from './services/billingApi'
 import EmailActionPage, { VerifyEmailPage } from './pages/EmailActionPage'
 import './workspace.css'
 import AppShell from './design-system/AppShell'
 import { Button, Skeleton } from './design-system/components'
 
 export default function App() {
-  const [addingBusiness, setAddingBusiness] = useState(false)
   const [emailAction, setEmailAction] = useState(() => {
     const params = new URLSearchParams(window.location.hash.slice(1))
     return params.has('action') ? { action: params.get('action') || '', token: params.get('token') || '' } : null
@@ -172,8 +173,8 @@ export default function App() {
     return <main className="page-content"><Skeleton label="Loading your workspace…" /></main>;
   }
 
-  if ((!isLoggedIn && authMode === 'signup') || (isLoggedIn && addingBusiness)) {
-    return <BusinessOnboardingPage register={!isLoggedIn} onBack={() => { setAuthMode('signin'); setAddingBusiness(false) }} />
+  if (!isLoggedIn && authMode === 'signup') {
+    return <BusinessOnboardingPage onBack={() => setAuthMode('signin')} />
   }
 
   if (!isLoggedIn) {
@@ -200,25 +201,15 @@ export default function App() {
   const business = organizations.find(item => item.organization_id === selectedBusiness)
   return <>
     <a className="skip-link" href="#workspace">Skip to workspace</a>
-    <header className="business-bar">
-      <strong>Vectra</strong>
-      {organizations.length > 1 ? <label>Business <select aria-label="Current business" value={selectedBusiness ?? ''} onChange={event => {
-        const id = Number(event.target.value)
-        selectBusiness(id); setSelectedBusiness(id); setContextRevision(value => value + 1)
-      }}>{organizations.map(item => <option key={item.organization_id} value={item.organization_id}>{item.name}</option>)}</select></label> : <span className="business-name">{business?.name}</span>}
-      <span className="business-role">{business?.staff_roles.join(' · ') || 'Member'}</span>
-      <div className="account-actions"><Button variant="secondary" onClick={() => setAddingBusiness(true)}>Add business</Button>
-      <Button variant="tertiary" onClick={handleLogout}>Sign out</Button></div>
-    </header>
     {business ? <BusinessContext.Provider value={business}>
-      <BillingGate key={`${business.organization_id}:${contextRevision}`} organizationId={business.organization_id}><Workspace coach={coach} handleLogout={handleLogout} /></BillingGate>
-    </BusinessContext.Provider> : <main id="workspace" tabIndex={-1} className="member-home"><h1>No active business access</h1><p>Contact your business administrator to link your account, or add a business you own.</p><button onClick={() => setAddingBusiness(true)}>Add business</button></main>}
+      <BillingGate key={`${business.organization_id}:${contextRevision}`} organizationId={business.organization_id}>{(billing, refreshBilling) => <Workspace coach={coach} handleLogout={handleLogout} billing={billing} refreshBilling={refreshBilling} organizations={organizations} selectedBusiness={selectedBusiness} onBusinessChange={id => { selectBusiness(id); setSelectedBusiness(id); setContextRevision(value => value + 1) }} onOrganizationNameChange={(organizationId, name) => setOrganizations(current => { const updated = current.map(item => item.organization_id === organizationId ? { ...item, name } : item); contextSignature.current = JSON.stringify(updated); return updated })} />}</BillingGate>
+    </BusinessContext.Provider> : <main id="workspace" tabIndex={-1} className="member-home"><h1>No active business access</h1><p>Contact your business administrator to link your account.</p></main>}
   </>
 }
 
-function Workspace({ coach, handleLogout }: { coach: CoachProfile | null; handleLogout: () => void }) {
+function Workspace({ coach, handleLogout, billing, refreshBilling, organizations, selectedBusiness, onBusinessChange, onOrganizationNameChange }: { coach: CoachProfile | null; handleLogout: () => void; billing: BillingSummary; refreshBilling: () => Promise<void>; organizations: OrganizationContext[]; selectedBusiness: number | null; onBusinessChange: (id: number) => void; onOrganizationNameChange: (organizationId: number, name: string) => void }) {
   const business = useBusiness()!
-  const [activeTab, setActiveTab] = useState<AppTab>('dashboard')
+  const [activeTab, setActiveTab] = useState<AppTab>(billing.access === 'pending' && billing.owner ? 'billing' : 'dashboard')
   const [selectedJob, setSelectedJob] = useState<SquatJobResponse | null>(null)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
@@ -226,12 +217,13 @@ function Workspace({ coach, handleLogout }: { coach: CoachProfile | null; handle
   const handleSelectClient = useCallback((client: Client) => {
     setSelectedClient(client); setSelectedClientId(client.id)
   }, [])
-  if (!business.staff_roles.length) return <MemberWorkspace />
-  if (memberView) return <><div className="workspace-shortcuts"><Button variant="secondary" onClick={() => { selectAccessMode("staff"); setMemberView(false) }}>Back to staff workspace</Button></div><MemberWorkspace /></>
+  if (!business.staff_roles.length) return <MemberWorkspace handleLogout={handleLogout} organizations={organizations} selectedBusiness={selectedBusiness} onBusinessChange={onBusinessChange} />
+  if (memberView) return <><div className="workspace-shortcuts"><Button variant="secondary" onClick={() => { selectAccessMode("staff"); setMemberView(false) }}>Back to staff workspace</Button></div><MemberWorkspace handleLogout={handleLogout} organizations={organizations} selectedBusiness={selectedBusiness} onBusinessChange={onBusinessChange} /></>
   const content = () => {
+  if (activeTab === 'billing' && billing.owner) return <BillingPage organizationId={business.organization_id} billing={billing} refresh={refreshBilling} />
   if (activeTab === 'inbox') return <InboxPage />
   if (activeTab === 'insights' && business.staff_roles.some(role => role === 'owner' || role === 'admin')) return <ReportsPage />
-  if (activeTab === 'gym-setup' && business.organization_type === 'gym' && business.staff_roles.some(role => role === 'owner' || role === 'admin')) return <GymSetupPage />
+  if (activeTab === 'gym-setup' && business.organization_type === 'gym' && business.staff_roles.some(role => role === 'owner' || role === 'admin')) return <GymSetupPage onGymNameChange={name => onOrganizationNameChange(business.organization_id, name)} refreshBilling={refreshBilling} />
   if (features.formAnalysis && activeTab === "recent-analysis") {
     return (
       <RecentAnalysisPage
@@ -291,14 +283,16 @@ function Workspace({ coach, handleLogout }: { coach: CoachProfile | null; handle
     />
   );
   }
-  return <AppShell activeTab={activeTab} onTabChange={setActiveTab} memberAction={business.client_id !== null ? () => { selectAccessMode('member'); setMemberView(true) } : undefined}>
+  return <AppShell activeTab={activeTab} onTabChange={setActiveTab} onSignOut={handleLogout} businesses={organizations} selectedBusiness={selectedBusiness} onBusinessChange={onBusinessChange} memberAction={business.client_id !== null ? () => { selectAccessMode('member'); setMemberView(true) } : undefined}>
+    {billing.access === 'read_only' && <p className="billing-banner">Read-only access. Existing records remain available. {billing.owner ? 'Renew in Billing to make changes.' : 'Contact the owner to renew.'}</p>}
+    {billing.access === 'grace' && <p className="billing-banner">Renewal needs attention. Grace ends {new Date(billing.grace_until!).toLocaleString('en-IN')}.</p>}
     {content()}
   </AppShell>
 }
 
-function MemberWorkspace() {
+function MemberWorkspace({ handleLogout, organizations, selectedBusiness, onBusinessChange }: { handleLogout: () => void; organizations: OrganizationContext[]; selectedBusiness: number | null; onBusinessChange: (id: number) => void }) {
   const [inbox, setInbox] = useState(false)
-  return <><nav className="workspace-shortcuts" aria-label="Member navigation">
+  return <><div className="member-home member-account-actions">{organizations.length > 1 && <label>Business<select aria-label="Current business" value={selectedBusiness ?? ''} onChange={event => onBusinessChange(Number(event.target.value))}>{organizations.map(item => <option key={item.organization_id} value={item.organization_id}>{item.name}</option>)}</select></label>}<Button variant="tertiary" onClick={handleLogout}>Sign out</Button></div><nav className="workspace-shortcuts" aria-label="Member navigation">
     <Button variant={inbox ? 'secondary' : 'primary'} onClick={() => setInbox(false)}>My coaching</Button>
     <Button variant={inbox ? 'primary' : 'secondary'} onClick={() => setInbox(true)}>Inbox</Button>
   </nav>{inbox ? <main id="workspace" tabIndex={-1}><InboxPage memberMode /></main> : <MemberPage />}</>

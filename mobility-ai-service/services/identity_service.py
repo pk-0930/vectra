@@ -108,7 +108,7 @@ class IdentityService:
             raise ValueError('Use a password between 12 and 256 characters.')
         name = payload['business_name'].strip()
         if not 1 <= len(name) <= 120 or payload['business_type'] not in {'gym', 'coaching'}:
-            raise ValueError('Enter a business name and type.')
+            raise ValueError('Enter a workspace name and type.')
         hashed = self.security.hash_password(payload['password'])
         with self.repository.transaction() as db:
             self.repository.lock_recipient(db, (email,))

@@ -25,6 +25,7 @@ export default function MembershipPayment({ purchase, admin = false, onChange, t
   const base = `/${admin ? 'gym' : 'member'}/purchases/${purchase.id}`
   const current = detail?.purchase ?? purchase
   const pending = ['pending', 'awaiting_verification', 'rejected'].includes(current.status)
+  const summaryDate = current.received_on ? `Received ${current.received_on}` : `Created ${new Date(current.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`
   async function run(action?: string) {
     setBusy(true); setError('')
     try {
@@ -43,8 +44,8 @@ export default function MembershipPayment({ purchase, admin = false, onChange, t
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed.') }
     finally { setBusy(false) }
   }
-  return <Card><h3>{admin ? current.snapshot.member_name : 'Payment and membership'}</h3><p>{rupees(current.amount_paise)} · {current.status.replaceAll('_', ' ')}</p>
-    <Button variant="secondary" disabled={busy} onClick={() => void run()}>View payment and membership</Button>
+  return <Card className="membership-payment-row"><h3>{admin ? current.snapshot.member_name : 'Payment and membership'}</h3><p>{current.snapshot.plans.map(plan => plan.name).join(', ') || 'Plan details unavailable'} · {current.received_on ? `${rupees(current.paid_amount_paise ?? current.amount_paise)} received${current.method ? ` · ${current.method.toUpperCase()}` : ''}${current.reference ? ` · ${current.reference}` : ''} · ${current.status.replaceAll('_', ' ')}` : `${rupees(current.amount_paise)} · ${current.status.replaceAll('_', ' ')}`}</p><p className="membership-payment-date">{summaryDate}</p>
+    <Button variant="secondary" disabled={busy} onClick={() => { if (opened) setOpened(false); else void run() }}>{opened ? 'Hide details' : admin ? 'Review payment' : 'View payment and membership'}</Button>
     {error && <p role="alert">{error}</p>}
     {opened && <div className="gym-payment-form">
       <p>UPI recipient recorded at purchase: {current.snapshot.payment.recipient_name} · {current.snapshot.payment.upi_id}. Check receipt with this recipient even if the gym has changed its QR.</p>

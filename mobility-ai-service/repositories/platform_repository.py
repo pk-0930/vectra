@@ -70,7 +70,11 @@ class PostgresPlatformRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT o.id AS organization_id, o.name, o.organization_type,
+                    SELECT o.id AS organization_id,
+                        CASE WHEN o.organization_type='gym'
+                            THEN COALESCE(NULLIF(g.configuration->>'display_name',''), o.name)
+                            ELSE o.name END AS name,
+                        o.organization_type,
                         r.id AS relationship_id,
                         ARRAY(SELECT role.role FROM organization_staff_roles role
                             WHERE role.organization_id=o.id AND role.relationship_id=r.id
@@ -78,6 +82,7 @@ class PostgresPlatformRepository:
                         c.id AS client_id
                     FROM organization_relationships r
                     JOIN organizations o ON o.id=r.organization_id
+                    LEFT JOIN gym_profiles g ON g.organization_id=o.id
                     LEFT JOIN clients c ON c.organization_id=o.id
                         AND c.organization_relationship_id=r.id
                     WHERE r.user_id=%s AND r.status='active' AND o.status='active'

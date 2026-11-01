@@ -6,7 +6,7 @@ export type SoftwarePlan = { code: string; name: string; business_type: 'gym' | 
 export type SoftwareSubscription = { id: string; provider_id: string | null; key_id: string | null; status: string; cancel_requested: boolean; cancel_confirmed: boolean; error_code: string | null; plan: SoftwarePlan }
 export type BillingSummary = {
   access: 'pending' | 'active' | 'grace' | 'read_only' | 'legacy'
-  owner: boolean; mode: 'test' | 'live'; checkout_available: boolean; business_name: string; business_type: string
+  owner: boolean; mode: 'test' | 'live' | 'local'; local_access: boolean; checkout_available: boolean; business_name: string; business_type: string
   paid_through: string | null; grace_until: string | null; legacy_until: string | null
   plans?: SoftwarePlan[]; terms_version?: string; terms?: string; subscription?: SoftwareSubscription | null
   payments?: Array<{ payment_id: string; invoice_id: string; amount_paise: number; refunded_paise: number; currency: string; period_start: string; period_end: string; paid_at: string }>

@@ -174,8 +174,15 @@ class PtService:
                 booked = db.execute("SELECT count(*) AS n FROM coaching_appointments WHERE organization_id=%s AND entitlement_id=%s AND status='booked' AND (%s::uuid IS NULL OR id<>%s::uuid)", (org, entitlement['purchase_id'], excluding, excluding)).fetchone()['n']
                 if entitlement['remaining_sessions'] <= booked:
                     raise ValueError('No unreserved session credit remains.')
-            elif db.execute("SELECT 1 FROM coaching_appointments WHERE organization_id=%s AND client_id=%s AND status<>'cancelled' AND (starts_at AT TIME ZONE 'Asia/Kolkata')::date=%s AND (%s::uuid IS NULL OR id<>%s::uuid)", (org, client, day, excluding, excluding)).fetchone():
-                raise ValueError('Duration PT allows one appointment per day.')
+            # Duration packages reserve one session per member per India-local day.
+            # Apply this as a separate guard so every booking path, including a
+            # second entitlement for the same client, observes the same limit.
+        if entitlement and entitlement['remaining_sessions'] is None and db.execute(
+                "SELECT 1 FROM coaching_appointments WHERE organization_id=%s AND client_id=%s "
+                "AND status<>'cancelled' AND (starts_at AT TIME ZONE 'Asia/Kolkata')::date=%s "
+                "AND (%s::uuid IS NULL OR id<>%s::uuid)",
+                (org, client, day, excluding, excluding)).fetchone():
+            raise ValueError('Duration PT allows one appointment per day.')
         if db.execute("SELECT 1 FROM coaching_appointments WHERE organization_id=%s AND (trainer_relationship_id=%s OR client_id=%s) AND status<>'cancelled' AND starts_at<%s AND ends_at>%s AND (%s::uuid IS NULL OR id<>%s::uuid)", (org, trainer, client, finish, start, excluding, excluding)).fetchone():
             raise ValueError('This time overlaps a trainer or client appointment.')
         return finish

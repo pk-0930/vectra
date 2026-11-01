@@ -30,9 +30,11 @@ class IdentityRepository(PostgresPlatformRepository):
     def claim_delivery(self, connection):
         return connection.execute(
             "SELECT e.*, a.kind, a.email, a.organization_id, a.role, a.expires_at, "
-            "a.consumed_at, a.revoked_at, a.token_hash, a.return_gym_public_id, o.name AS business_name, n.recipient, n.subject, n.message "
+            "a.consumed_at, a.revoked_at, a.token_hash, a.return_gym_public_id, "
+            "COALESCE(NULLIF(g.configuration->>'display_name',''), o.name) AS business_name, n.recipient, n.subject, n.message "
             "FROM email_outbox e LEFT JOIN identity_actions a ON a.id=e.action_id "
-            "LEFT JOIN organizations o ON o.id=a.organization_id LEFT JOIN billing_notifications n ON n.id=e.billing_notification_id "
+            "LEFT JOIN organizations o ON o.id=a.organization_id LEFT JOIN gym_profiles g ON g.organization_id=o.id "
+            "LEFT JOIN billing_notifications n ON n.id=e.billing_notification_id "
             "WHERE e.status='pending' AND e.available_at<=now() "
             "ORDER BY e.available_at FOR UPDATE OF e SKIP LOCKED LIMIT 1"
         ).fetchone()

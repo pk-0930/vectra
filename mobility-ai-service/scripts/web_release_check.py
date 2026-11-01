@@ -18,7 +18,10 @@ from services.email_delivery_service import public_web_url
 
 
 def configuration_checks(environment):
-    checks = {}
+    checks = {
+        'application_environment': os.environ.get('APP_ENVIRONMENT') == environment,
+        'local_billing_access_disabled': os.environ.get('SOFTWARE_BILLING_LOCAL_ACCESS', 'false').lower() == 'false',
+    }
     for name, operation in [('authentication', get_auth_config), ('database_configuration', get_postgres_config),
                             ('public_web_url', public_web_url), ('billing_configuration', get_billing_config)]:
         try:

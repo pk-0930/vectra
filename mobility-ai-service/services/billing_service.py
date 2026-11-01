@@ -40,6 +40,8 @@ class BillingService:
         self.provider = provider or RazorpayService(self.config)
 
     def state(self, db, org):
+        if self.config.local_access:
+            return {'access': 'legacy', 'paid_through': None, 'grace_until': None, 'legacy_until': None}
         return access_state(self.repository.organization(db, org), self.repository.payments(db, org, self.config.mode))
 
     @staticmethod
@@ -51,7 +53,7 @@ class BillingService:
         self.require_verified(user)
         name = name.strip()
         if kind not in {'gym','coaching'} or not 1 <= len(name) <= 120:
-            raise ValueError('Enter a business name and select gym or online coaching.')
+            raise ValueError('Enter a workspace name and select gym or online coaching.')
         with self.repository.transaction() as db:
             org = self.repository.create_business(db, user['id'], request_id, name, kind)
         return {'organization_id': org}
@@ -61,9 +63,11 @@ class BillingService:
             access = self.repository.authorize(db, org, user['id'])
             organization = self.repository.organization(db, org)
             payments = self.repository.payments(db, org, self.config.mode)
-            result = {**access_state(organization, payments), 'mode': self.config.mode,
-                      'owner': 'owner' in access.roles, 'checkout_available': self.config.enabled,
-                      'business_name': organization['name'], 'business_type': organization['organization_type']}
+            result = {**self.state(db, org), 'mode': 'local' if self.config.local_access else self.config.mode,
+                      'local_access': self.config.local_access, 'owner': 'owner' in access.roles,
+                      'checkout_available': self.config.enabled,
+                      'business_name': organization.get('workspace_name', organization['name']),
+                      'business_type': organization['organization_type']}
             if not result['owner']: return result
             subs = self.repository.subscriptions(db, org, self.config.mode)
             result.update({
@@ -225,28 +229,29 @@ class BillingService:
                 cancel_confirmed = True
             with self.repository.transaction() as db:
                 organization = self.repository.organization(db, row['organization_id'], lock=True)
+                workspace_name = organization.get('workspace_name', organization['name'])
                 current = self.repository.lock_claim(db, row)
                 if not current: return True
                 for payment in payments:
                     created = self.repository.upsert_payment(db, row, payment)
                     if created:
                         self.repository.notify_owners(db, row['organization_id'], f"{row['mode']}:paid:{payment['invoice_id']}",
-                            'Vectra software payment confirmed', f"Payment of INR {payment['amount_paise']/100:.2f} for {organization['name']} "
+                            'Vectra software payment confirmed', f"Payment of INR {payment['amount_paise']/100:.2f} for {workspace_name} "
                             f"is verified. Coverage: {payment['period_start'].isoformat()} to {payment['period_end'].isoformat()}.")
                     if payment['refunded_paise']:
                         self.repository.notify_owners(db, row['organization_id'],
                             f"{row['mode']}:refund:{payment['payment_id']}:{payment['refunded_paise']}",
                             'Vectra software refund update',
-                            f"A refund of INR {payment['refunded_paise']/100:.2f} is recorded for {organization['name']}. "
+                            f"A refund of INR {payment['refunded_paise']/100:.2f} is recorded for {workspace_name}. "
                             'Full refunds remove coverage for that invoice. Partial refunds preserve its service dates.')
                 if remote['status'] in {'pending','halted','paused','cancelled','completed','expired'} and remote['status'] != current['status']:
                     self.repository.notify_owners(db, row['organization_id'], f"{row['id']}:{remote['status']}:{remote.get('current_end')}",
-                        'Vectra software billing update', f"The software subscription for {organization['name']} is {remote['status']}. "
+                        'Vectra software billing update', f"The software subscription for {workspace_name} is {remote['status']}. "
                         'Existing paid coverage is preserved. Open Billing in Vectra to review your access and payment history.')
                 if cancel_confirmed and not current['cancel_confirmed']:
                     self.repository.notify_owners(db, row['organization_id'], f"{row['id']}:cancellation_confirmed",
                         'Vectra software renewal cancellation confirmed',
-                        f"Future renewals for {organization['name']} have been cancelled. Existing paid coverage remains until its end date.")
+                        f"Future renewals for {workspace_name} have been cancelled. Existing paid coverage remains until its end date.")
                 self.repository.finish_sync(db, row, remote, cancel_confirmed)
         except ProviderError as exc:
             self.repository.fail_sync(row, exc.code, definitive=exc.definitive and row['status'] == 'queued')

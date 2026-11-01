@@ -30,6 +30,7 @@ export default function BillingPage({ organizationId, billing, refresh }: { orga
   }
   return <main id="workspace" tabIndex={-1} className="member-home billing-page"><PageHeader eyebrow="Business / subscription" title={`Billing for ${billing.business_name}`} description="Your Vectra software subscription. Gym membership and PT collections are separate." />
     {billing.mode === 'test' && <p className="billing-banner">Test mode — test payments do not grant live billing access.</p>}
+    {billing.local_access && <p className="billing-banner">Local testing access — checkout is disabled and no software payment is recorded.</p>}
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     <section className="workspace-card"><div className="section-heading"><h2>Workspace access</h2><StatusBadge tone={billing.access === 'active' || billing.access === 'legacy' ? 'success' : 'warning'}>{{ pending: 'Awaiting payment', active: 'Active', grace: 'Renewal grace period', read_only: 'Read-only', legacy: 'Legacy access' }[billing.access]}</StatusBadge></div><p>Paid through: {date(billing.paid_through)}</p>
       {billing.access === 'legacy' && <p>Existing access is preserved. {billing.legacy_until ? `Transition ends ${date(billing.legacy_until)}.` : 'No transition deadline has been scheduled.'}</p>}

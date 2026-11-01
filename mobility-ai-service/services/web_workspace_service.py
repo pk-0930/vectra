@@ -37,6 +37,7 @@ class WebWorkspaceService:
         return self.repository.reports(access, start, end, today)
 
     def set_rollout(self, access, enabled):
+        access.require_admin()
         if 'owner' not in access.roles:
-            raise AccessDenied('Only the owner can change purchase availability.')
+            raise AccessDenied('Only the business owner can change purchase availability.')
         return self.repository.set_rollout(access, enabled)

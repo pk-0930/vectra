@@ -1,5 +1,6 @@
 """Web-only workspace rules. Historical published content survives package expiry."""
 from datetime import timedelta
+from repositories.access_repository import AccessDenied
 from repositories.web_workspace_repository import WebWorkspaceRepository
 from services.membership_service import today_india
 
@@ -37,4 +38,6 @@ class WebWorkspaceService:
 
     def set_rollout(self, access, enabled):
         access.require_admin()
+        if 'owner' not in access.roles:
+            raise AccessDenied('Only the business owner can change purchase availability.')
         return self.repository.set_rollout(access, enabled)

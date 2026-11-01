@@ -131,6 +131,11 @@ class GymService:
         if access.context['organization_type'] != 'gym':
             raise AccessDenied('Gym setup is available only in gym businesses.')
 
+    @staticmethod
+    def require_owner(access):
+        if 'owner' not in access.roles:
+            raise AccessDenied('Only the business owner can manage payment details.')
+
     def setup(self, access):
         self.require_admin(access)
         # GET does not create a profile, so read-only billing remains genuinely read-only.
@@ -162,6 +167,7 @@ class GymService:
             raise CatalogueChanged('Gym setup changed. Reload and review the latest version before saving.')
         old = row['configuration'].get('payment', DEFAULT_CONFIG['payment'])
         if config['payment'] != old:
+            self.require_owner(access)
             if not confirm_payment:
                 raise ValueError('Preview and confirm the recipient, UPI ID and payment QR before saving.')
         trainers = {r['id'] for r in self.repository.trainers(db, org)}
@@ -178,6 +184,8 @@ class GymService:
         self.require_admin(access)
         if kind not in {'logo', 'payment_qr'}:
             raise ValueError('Unsupported image type.')
+        if kind == 'payment_qr':
+            self.require_owner(access)
         png = clean_image(raw)
         db = access.connection
         self.repository.ensure_profile(db, access.organization_id)

@@ -45,7 +45,7 @@ export default function AccessPage() {
   }
   return <main className="member-home"><PageHeader eyebrow="Business / people" title="A team built for progress." description={`Manage staff and client assignments in ${business.name}. Role changes apply only to this business.`} />
     {error && <p role="alert">{error}</p>}
-    <section className="workspace-card"><h2>Invite staff or a coaching client</h2><p>Invitations expire after 3 days. Client invitations link an existing profile after email ownership is verified; they grant no staff permissions. Only owners can invite admins.</p>
+    <section className="workspace-card"><h2>Invite staff or a coaching client</h2><p>Invitations expire after 3 days. Client invitations link an existing profile after email ownership is verified; they grant no staff permissions. Only owners can invite, revoke, or remove admins.</p>
       <form className="invitation-form" onSubmit={event => { event.preventDefault(); void change('/organization/invitations', 'POST', { email: inviteEmail, role: inviteRole, client_id: inviteRole === 'client' ? Number(inviteClient) : null }) }}>
         <label>Email address<input type="email" required maxLength={254} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} /></label>
         <label>Role<select value={inviteRole} onChange={event => setInviteRole(event.target.value)}><option value="trainer">Trainer</option><option value="client">Coaching client</option>{business.staff_roles.includes('owner') && <option value="admin">Admin</option>}</select></label>

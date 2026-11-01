@@ -1,7 +1,7 @@
 import { features } from '../services/features'
 import { useBusiness } from '../components/BusinessContext'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, RefreshCw, UsersRound, Activity, Target, ScanLine } from 'lucide-react'
+import { ArrowRight, UsersRound, Activity, Target, ScanLine } from 'lucide-react'
 import { Button, Card, PageHeader, StatusBadge, Skeleton, EmptyState } from '../design-system/components'
 import { listClients } from '../services/clientApi'
 import { listNutritionPlans, listWorkoutPlans } from '../services/planApi'
@@ -15,7 +15,6 @@ import type { SquatJobResponse } from '../types/squat'
 type Props = { activeTab: AppTab; onTabChange: (tab: AppTab) => void; onLogout: () => void; requestedJob?: SquatJobResponse | null; onJobLoaded?: (job: SquatJobResponse) => void; selectedClient?: Client | null; selectedClientId?: number | null; coach?: CoachProfile | null }
 export default function DashboardPage({ onTabChange, selectedClient, selectedClientId, coach }: Props) {
   const business = useBusiness()
-  const canCreate = business?.staff_roles.some(role => role === 'owner' || role === 'admin')
   const [clients, setClients] = useState<Client[]>([])
   const [analyses, setAnalyses] = useState<SquatJobResponse[]>([])
   const [nutritionPlans, setNutritionPlans] = useState<Plan[]>([])
@@ -77,7 +76,7 @@ export default function DashboardPage({ onTabChange, selectedClient, selectedCli
     ...(features.formAnalysis ? [{ label: 'Recent analyses', value: analyses.length, note: `Latest 12 · ${completedAnalyses} complete`, Icon: ScanLine }] : []),
   ]
   return <main className="page-content dashboard">
-    <PageHeader eyebrow={business?.name || 'Your workspace'} title="Ready for the next step." description={coach ? `Welcome back, ${coach.first_name}. Keep your clients moving forward.` : 'Your clients, their progress, and the work ahead.'} actions={<><Button variant="secondary" disabled={isLoading} onClick={loadDashboard} aria-label="Refresh dashboard"><RefreshCw size={16} /></Button><Button onClick={() => onTabChange('clients')}>{canCreate ? 'Manage clients' : 'Assigned clients'}<ArrowRight size={16} /></Button></>} />
+    <PageHeader eyebrow={business?.name || 'Your workspace'} title="Ready for the next step." description={coach ? `Welcome back, ${coach.first_name}. Keep your clients moving forward.` : 'Your clients, their progress, and the work ahead.'} />
     {error && <p role="alert" className="error-notice">{error} Refresh to try again.</p>}
     {isLoading ? <Skeleton label="Loading your workspace overview…" /> : <section className="kpi-grid" aria-label="Workspace metrics">{metrics.map(({ label, value, note, Icon }) => <Card key={label} className="kpi-card"><div className="kpi-label"><span>{label}</span><Icon size={18} /></div><div className="metric-value">{error ? '—' : value}</div><p>{error ? 'Could not refresh data' : note}</p></Card>)}</section>}
     <div className="dashboard-grid">

@@ -749,7 +749,7 @@ export default function ClientsPage({
             </p>
           </div>
           <div className="header-actions">
-            {canCreateClient && <button style={styles.primaryButton} onClick={() => setDrawer("create-client")}><Plus size={16} />Create client</button>}
+            {canCreateClient && <button className="button button--primary" onClick={() => setDrawer("create-client")}><Plus size={16} />Create client</button>}
           </div>
         </div>
 
@@ -760,7 +760,7 @@ export default function ClientsPage({
           <section className="client-rail" style={styles.clientRail}>
             <div className="flow-header" style={styles.panelHeader}>
               <div style={styles.panelTitle}>Client list</div>
-              <button style={styles.secondaryButton} onClick={loadClients} disabled={isLoading}>
+              <button className="button button--secondary" onClick={loadClients} disabled={isLoading}>
                 <RefreshCw size={16} />
                 {isLoading ? "Refreshing..." : "Refresh"}
               </button>
@@ -811,7 +811,7 @@ export default function ClientsPage({
                         {selectedClient.current_goal_type ? formatGoal(selectedClient.current_goal_type) : "No current goal"} · <StatusBadge tone={selectedClient.is_active ? "success" : "neutral"}>{selectedClient.is_active ? "Active" : "Inactive"}</StatusBadge>
                       </div>
                     </div></div>
-                    <button style={styles.secondaryButton} onClick={() => loadClientWorkspace(selectedClient.id)}>
+                    <button className="button button--secondary" onClick={() => loadClientWorkspace(selectedClient.id)}>
                       Refresh detail
                     </button>
                   </div>
@@ -908,7 +908,7 @@ export default function ClientsPage({
             <LabeledField label="Last name">
               <input value={createClientForm.last_name} onChange={(e) => setCreateClientForm((current) => ({ ...current, last_name: e.target.value }))} style={styles.input} required />
             </LabeledField>
-            <button type="submit" style={styles.primaryButton}><Plus size={16} />Create client</button>
+            <button type="submit" className="button button--primary"><Plus size={16} />Create client</button>
           </form>
         ) : null}
 
@@ -933,7 +933,7 @@ export default function ClientsPage({
               <input type="checkbox" checked={profileForm.is_active} onChange={(e) => setProfileForm((current) => ({ ...current, is_active: e.target.checked }))} />
               Active client
             </label>
-            <button type="submit" style={styles.primaryButton} disabled={isSavingProfile}><Save size={16} />{isSavingProfile ? "Saving..." : "Save profile"}</button>
+            <button type="submit" className="button button--primary" disabled={isSavingProfile}><Save size={16} />{isSavingProfile ? "Saving..." : "Save profile"}</button>
           </form>
         ) : null}
 
@@ -951,7 +951,7 @@ export default function ClientsPage({
             <LabeledField label="Start date"><input type="date" value={goalForm.start_date} onChange={(e) => setGoalForm((current) => ({ ...current, start_date: e.target.value }))} style={styles.input} /></LabeledField>
             <LabeledField label="End date"><input type="date" value={goalForm.end_date} onChange={(e) => setGoalForm((current) => ({ ...current, end_date: e.target.value }))} style={styles.input} /></LabeledField>
             <LabeledField label="Goal notes"><textarea value={goalForm.notes} onChange={(e) => setGoalForm((current) => ({ ...current, notes: e.target.value }))} style={styles.textarea} /></LabeledField>
-            <button type="submit" style={styles.primaryButton} disabled={isSavingGoal}><Target size={16} />{isSavingGoal ? "Saving..." : "Save goal"}</button>
+            <button type="submit" className="button button--primary" disabled={isSavingGoal}><Target size={16} />{isSavingGoal ? "Saving..." : "Save goal"}</button>
           </form>
         ) : null}
 
@@ -969,7 +969,7 @@ export default function ClientsPage({
               <input type="file" accept="image/*" onChange={(e) => setProgressPhotoFile(e.target.files?.[0] ?? null)} style={styles.input} />
             </LabeledField>
             <LabeledField label="Caption"><textarea value={progressPhotoForm.caption} onChange={(e) => setProgressPhotoForm((current) => ({ ...current, caption: e.target.value }))} style={styles.textarea} /></LabeledField>
-            <button type="submit" style={styles.primaryButton} disabled={isSavingProgressPhoto}><ImagePlus size={16} />{isSavingProgressPhoto ? "Uploading..." : "Upload progress photo"}</button>
+            <button type="submit" className="button button--primary" disabled={isSavingProgressPhoto}><ImagePlus size={16} />{isSavingProgressPhoto ? "Uploading..." : "Upload progress photo"}</button>
           </form>
         ) : null}
 
@@ -1191,7 +1191,7 @@ function FormAnalysisTab({
             <LabeledField label="Squat video" helper={analysisFile ? `Selected: ${analysisFile.name}` : "Upload a side or front view squat video for this client."}>
               <input type="file" accept="video/*" onChange={(e) => setAnalysisFile(e.target.files?.[0] ?? null)} style={styles.input} />
             </LabeledField>
-            <button type="submit" style={styles.primaryButton} disabled={isCreatingAnalysis}>
+            <button type="submit" className="button button--primary" disabled={isCreatingAnalysis}>
               <Activity size={16} />
               {isCreatingAnalysis ? "Queueing..." : "Start form analysis"}
             </button>
@@ -1259,7 +1259,7 @@ function FormAnalysisTab({
                           <td style={styles.td}>{row.status}</td>
                           <td style={styles.td}>{row.frame}</td>
                           <td style={styles.td}>
-                            <button style={row.rep === selectedRepNumber ? styles.smallButtonActive : styles.smallButton} onClick={() => setSelectedRepNumber(row.rep)}>
+                            <button className={row.rep === selectedRepNumber ? 'button button--primary' : 'button button--secondary'} onClick={() => setSelectedRepNumber(row.rep)}>
                               {row.rep === selectedRepNumber ? "Viewing" : "View frame"}
                             </button>
                           </td>
@@ -1293,7 +1293,7 @@ function FormAnalysisTab({
                 <textarea value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} style={styles.textareaLarge} />
               </LabeledField>
               <div style={styles.actionRow}>
-                <button style={styles.primaryButton} onClick={onSaveFeedback} disabled={isSavingFeedback}><Save size={16} />{isSavingFeedback ? "Saving..." : "Save coach note"}</button>
+                <button className="button button--primary" onClick={onSaveFeedback} disabled={isSavingFeedback}><Save size={16} />{isSavingFeedback ? "Saving..." : "Save coach note"}</button>
                 {selectedJob ? <PdfLink href={getFormAnalysisPdfUrl(selectedJob.id)} label="Export PDF" /> : null}
               </div>
             </div>
@@ -1356,7 +1356,7 @@ function PlanForm({
       <LabeledField label="Meals or daily structure"><textarea value={draft.meals} onChange={(e) => onDraftChange((current) => ({ ...current, meals: e.target.value }))} style={styles.textarea} /></LabeledField>
       <LabeledField label="Training split or workout days"><textarea value={draft.workout_days} onChange={(e) => onDraftChange((current) => ({ ...current, workout_days: e.target.value }))} style={styles.textarea} /></LabeledField>
       <LabeledField label="Coach notes"><textarea value={draft.notes} onChange={(e) => onDraftChange((current) => ({ ...current, notes: e.target.value }))} style={styles.textarea} /></LabeledField>
-      <button type="submit" style={styles.primaryButton} disabled={isSaving}><Plus size={16} />{isSaving ? "Saving..." : `Create ${title.toLowerCase()}`}</button>
+      <button type="submit" className="button button--primary" disabled={isSaving}><Plus size={16} />{isSaving ? "Saving..." : `Create ${title.toLowerCase()}`}</button>
     </form>
   );
 }
@@ -1423,7 +1423,7 @@ function AiPlanDraftForm({
       <LabeledField label="Coach instructions"><textarea value={form.coach_prompt} onChange={(e) => onFormChange((current) => ({ ...current, coach_prompt: e.target.value }))} style={styles.textarea} placeholder="Optional guidance for this draft" /></LabeledField>
 
       {!activeDraft ? (
-        <button type="submit" style={styles.secondaryButton} disabled={isGenerating}><Sparkles size={16} />{isGenerating ? "Generating..." : "Generate AI draft"}</button>
+        <button type="submit" className="button button--secondary" disabled={isGenerating}><Sparkles size={16} />{isGenerating ? "Generating..." : "Generate AI draft"}</button>
       ) : (
         <>
           <SectionEyebrow title="Editable draft" />
@@ -1441,12 +1441,12 @@ function AiPlanDraftForm({
           )}
           <LabeledField label="Coach notes"><textarea value={edit.notes} onChange={(e) => onEditChange((current) => ({ ...current, notes: e.target.value }))} style={styles.textarea} /></LabeledField>
           <div style={styles.actionRow}>
-            <button type="button" style={styles.secondaryButton} onClick={onRegenerate} disabled={isGenerating}><RefreshCw size={16} />{isGenerating ? "Regenerating..." : "Regenerate"}</button>
-            <button type="button" style={styles.secondaryButton} onClick={onSave} disabled={isSaving}><Save size={16} />{isSaving ? "Saving..." : "Save draft"}</button>
+            <button type="button" className="button button--secondary" onClick={onRegenerate} disabled={isGenerating}><RefreshCw size={16} />{isGenerating ? "Regenerating..." : "Regenerate"}</button>
+            <button type="button" className="button button--secondary" onClick={onSave} disabled={isSaving}><Save size={16} />{isSaving ? "Saving..." : "Save draft"}</button>
           </div>
           <div style={styles.actionRow}>
-            <button type="button" style={styles.secondaryButton} onClick={onDiscard} disabled={isDiscarding}>{isDiscarding ? "Discarding..." : "Discard"}</button>
-            <button type="button" style={styles.primaryButton} onClick={onApprove} disabled={isApproving}><Sparkles size={16} />{isApproving ? "Approving..." : "Approve as plan"}</button>
+            <button type="button" className="button button--secondary" onClick={onDiscard} disabled={isDiscarding}>{isDiscarding ? "Discarding..." : "Discard"}</button>
+            <button type="button" className="button button--primary" onClick={onApprove} disabled={isApproving}><Sparkles size={16} />{isApproving ? "Approving..." : "Approve as plan"}</button>
           </div>
         </>
       )}
@@ -1507,7 +1507,7 @@ function SectionHeader({
           {headerActions.map((action) => {
             const ActionIcon = action.icon ?? (action.label.includes("Refresh") ? RefreshCw : Plus);
             return (
-              <button key={action.label} type="button" style={styles.secondaryButton} onClick={action.onAction} title={action.title}>
+              <button key={action.label} type="button" className="button button--secondary" onClick={action.onAction} title={action.title}>
                 <ActionIcon size={16} />
                 {action.label}
               </button>
@@ -1567,7 +1567,7 @@ function PdfLink({ href, label, onClick }: { href: string; label: string; onClic
       href={href}
       target="_blank"
       rel="noreferrer"
-      style={styles.linkButton}
+      className="button button--primary"
       onClick={(event) => {
         onClick?.(event);
         event.preventDefault();
@@ -1584,7 +1584,7 @@ function PlanHistoryCard({ plan, getPdfUrl, onOpen }: { plan: Plan; getPdfUrl: (
   return <article style={styles.historyCard}>
     <div className="section-heading"><div><h3 style={styles.historyTitle}>{plan.title}</h3><p style={styles.historyMeta}>{plan.period_type} · {plan.period_start} to {plan.period_end}</p></div><PdfLink href={getPdfUrl(plan.id)} label="PDF" /></div>
     <p style={styles.historySummary}>{plan.content.summary || plan.content.focus || 'No summary added.'}</p>
-    <button type="button" style={styles.secondaryButton} onClick={() => onOpen(plan)}>View plan<ClipboardList size={16} /></button>
+    <button type="button" className="button button--secondary" onClick={() => onOpen(plan)}>View plan<ClipboardList size={16} /></button>
   </article>
 }
 
@@ -1611,7 +1611,7 @@ function renderDetailTab(
   onChange: React.Dispatch<React.SetStateAction<DetailTab>>
 ) {
   return (
-    <button type="button" aria-pressed={activeTab === tab} style={activeTab === tab ? styles.detailTabActive : styles.detailTab} onClick={() => onChange(tab)}>
+    <button type="button" aria-pressed={activeTab === tab} className={activeTab === tab ? "button button--primary" : "button button--secondary"} onClick={() => onChange(tab)}>
       <Icon size={16} />
       {label}
     </button>
@@ -1793,8 +1793,6 @@ const styles: Record<string, React.CSSProperties> = {
   panelTitleWrap: { display: "flex", alignItems: "center", gap: 10 },
   panelIcon: { width: 34, height: 34, borderRadius: THEME.radii.md, backgroundColor: THEME.colors.accentMuted, color: THEME.colors.accentDeep, display: "flex", alignItems: "center", justifyContent: "center" },
   panelText: { color: THEME.colors.textSoft, lineHeight: 1.6, margin: "8px 0 0" },
-  primaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px 14px", borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, fontWeight: 700, cursor: "pointer", boxShadow: `0 10px 22px ${THEME.shadows.primarySoft}` },
-  secondaryButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, color: THEME.colors.primaryDeep, fontWeight: 700, cursor: "pointer" },
   errorBox: { backgroundColor: THEME.colors.dangerSurface, color: THEME.colors.danger, border: `1px solid ${THEME.colors.danger}`, borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
   successBox: { backgroundColor: THEME.colors.successSurface, color: THEME.colors.success, border: `1px solid ${THEME.colors.success}`, borderRadius: THEME.radii.sm, padding: 14, marginBottom: 16 },
   clientList: { display: "flex", flexDirection: "column", gap: 10 },
@@ -1804,8 +1802,6 @@ const styles: Record<string, React.CSSProperties> = {
   clientMeta: { marginTop: 6, color: THEME.colors.textMuted, fontSize: 13 },
   workspaceHeader: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start", marginBottom: 18 },
   detailTitle: { margin: 0, fontWeight: 800, fontSize: 24, color: THEME.colors.ink },
-  detailTab: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, color: THEME.colors.textSoft, cursor: "pointer", fontWeight: 700 },
-  detailTabActive: { display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: THEME.radii.pill, border: PRIMARY_BORDER, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, cursor: "pointer", fontWeight: 700 },
   snapshotGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   snapshotRow: { color: THEME.colors.textSoft, lineHeight: 1.5 },
   snapshotLabel: { display: "block", color: THEME.colors.textMuted, fontSize: 12, fontWeight: 800, marginBottom: 3 },
@@ -1822,7 +1818,6 @@ const styles: Record<string, React.CSSProperties> = {
   historyTitle: { fontWeight: 800, color: THEME.colors.text },
   historyMeta: { color: THEME.colors.textMuted, fontSize: 13, marginTop: 4 },
   historySummary: { color: THEME.colors.textSoft, marginTop: 10, lineHeight: 1.5, whiteSpace: "pre-wrap" },
-  linkButton: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", borderRadius: THEME.radii.sm, backgroundColor: THEME.colors.indigo, color: THEME.colors.onBrand, textDecoration: "none", fontSize: 14, fontWeight: 700 },
   fieldGroup: { display: "flex", flexDirection: "column", gap: 6 },
   fieldLabel: { color: THEME.colors.text, fontSize: 13, fontWeight: 800 },
   helperText: { color: THEME.colors.textMuted, fontSize: 12, lineHeight: 1.4 },
@@ -1851,7 +1846,6 @@ const styles: Record<string, React.CSSProperties> = {
   tdStrong: { padding: "12px 8px", borderBottom: `1px solid ${THEME.colors.surfaceMuted}`, fontSize: 14, fontWeight: 800, color: THEME.colors.text },
   selectedRow: { backgroundColor: THEME.colors.surfaceMuted },
   smallButton: { padding: "8px 10px", borderRadius: THEME.radii.sm, border: `1px solid ${THEME.colors.borderStrong}`, backgroundColor: THEME.colors.surface, cursor: "pointer" },
-  smallButtonActive: { padding: "8px 10px", borderRadius: THEME.radii.sm, border: PRIMARY_BORDER, backgroundColor: THEME.colors.primary, color: THEME.colors.onBrand, cursor: "pointer" },
   infoCard: { backgroundColor: THEME.colors.surfaceMuted, borderRadius: THEME.radii.sm, padding: 14, marginTop: 12, color: THEME.colors.textSoft, lineHeight: 1.6 },
   infoTitle: { fontWeight: 800, marginBottom: 6, color: THEME.colors.primaryDeep },
   actionRow: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginTop: 14 },

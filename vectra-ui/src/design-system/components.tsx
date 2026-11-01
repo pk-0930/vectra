@@ -2,8 +2,8 @@ import { useEffect, useId, useRef } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { ArrowUpRight, X } from 'lucide-react'
 
-export function Button({ variant = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'tertiary' | 'danger' }) {
-  return <button type="button" className={`button button--${variant} ${className}`} {...props} />
+export function Button({ variant = 'primary', size = 'standard', className = '', ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'size'> & { variant?: 'primary' | 'secondary' | 'tertiary' | 'danger'; size?: 'standard' | 'large' }) {
+  return <button type="button" className={`button button--${variant} button--${size} ${className}`} {...props} />
 }
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
   return <header className="page-header"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p className="page-description">{description}</p>}</div>{actions && <div className="header-actions">{actions}</div>}</header>

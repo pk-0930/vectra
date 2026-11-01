@@ -1,6 +1,7 @@
 """Published gym catalogues and immutable, unpaid onboarding requests."""
 from io import BytesIO
 from contextlib import nullcontext
+from copy import deepcopy
 import hashlib
 import json
 import re
@@ -104,9 +105,18 @@ def validate_config(config):
                 UUID(str(value))
             except ValueError:
                 raise ValueError('Upload an image before saving.') from None
-    if result['registration_enabled'] and (not any(p['active'] and p['kind'] == 'gym' for p in result['plans'])
-            or not all(result['payment'].values())):
-        raise ValueError('Publish at least one gym plan and confirm all payment details before enabling registration.')
+    if result['registration_enabled']:
+        missing = []
+        if not any(p['active'] and p['kind'] == 'gym' for p in result['plans']):
+            missing.append('an active gym membership plan')
+        if not result['payment']['recipient_name']:
+            missing.append('the payment recipient name')
+        if not result['payment']['upi_id']:
+            missing.append('the payment UPI ID')
+        if not result['payment']['qr_asset_id']:
+            missing.append('an uploaded payment QR')
+        if missing:
+            raise ValueError('Before accepting registrations, provide ' + ', '.join(missing) + '.')
     return result
 
 
@@ -126,7 +136,10 @@ class GymService:
         # GET does not create a profile, so read-only billing remains genuinely read-only.
         db, org = access.connection, access.organization_id
         row = self.repository.profile(db, org)
-        config = row['configuration'] if row else dict(DEFAULT_CONFIG)
+        organization = self.repository.organization(db, org)
+        config = deepcopy(row['configuration']) if row else deepcopy(DEFAULT_CONFIG)
+        if not config.get('display_name'):
+            config['display_name'] = organization['name']
         try:
             join_url = self.join_url(row) if row else None
         except ValueError:
@@ -134,8 +147,7 @@ class GymService:
         return {'revision': row['revision'] if row else 0, 'configuration': config,
                 'public_id': row['public_id'] if row else None,
                 'join_url': join_url,
-                'trainers': self.repository.trainers(db, org), 'can_edit_payment': 'owner' in access.roles,
-                'audit': self.repository.audit(db, org)}
+                'trainers': self.repository.trainers(db, org), 'can_edit_payment': True}
 
     @staticmethod
     def join_url(row):
@@ -150,8 +162,6 @@ class GymService:
             raise CatalogueChanged('Gym setup changed. Reload and review the latest version before saving.')
         old = row['configuration'].get('payment', DEFAULT_CONFIG['payment'])
         if config['payment'] != old:
-            if 'owner' not in access.roles:
-                raise AccessDenied('Only the gym owner can change the payment destination.')
             if not confirm_payment:
                 raise ValueError('Preview and confirm the recipient, UPI ID and payment QR before saving.')
         trainers = {r['id'] for r in self.repository.trainers(db, org)}
@@ -161,14 +171,13 @@ class GymService:
             if asset_id and not self.repository.asset_matches(db, asset_id, org, kind):
                 raise ValueError('This image does not belong to this gym or image type.')
         self.repository.save_profile(db, org, access.user_id, row['revision'] + 1, config)
+        self.repository.rename_organization(db, org, config['display_name'])
         return self.setup(access)
 
     def upload(self, access, kind, raw):
         self.require_admin(access)
         if kind not in {'logo', 'payment_qr'}:
             raise ValueError('Unsupported image type.')
-        if kind == 'payment_qr' and 'owner' not in access.roles:
-            raise AccessDenied('Only the gym owner can upload a payment QR.')
         png = clean_image(raw)
         db = access.connection
         self.repository.ensure_profile(db, access.organization_id)

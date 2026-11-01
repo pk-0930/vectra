@@ -14,13 +14,22 @@ class BillingConfig:
     plans: tuple = ()
     grace_days: int = 7
     terms_version: str = 'software-v1'
+    environment: str = 'production'
+    local_access: bool = False
 
     @property
     def enabled(self):
-        return bool(self.key_id and self.key_secret and self.webhook_secret and self.plans)
+        return bool(not self.local_access and self.key_id and self.key_secret and self.webhook_secret and self.plans)
 
 
 def get_billing_config():
+    environment = os.environ.get('APP_ENVIRONMENT', 'production')
+    local_access = os.environ.get('SOFTWARE_BILLING_LOCAL_ACCESS', 'false').lower()
+    if environment not in {'local', 'staging', 'production'} or local_access not in {'true', 'false'}:
+        raise ValueError('Invalid application environment or local billing access setting.')
+    local_access = local_access == 'true'
+    if local_access and environment != 'local':
+        raise ValueError('Local software billing access can only be enabled in the local environment.')
     mode = os.environ.get('RAZORPAY_MODE', 'test')
     key = os.environ.get('RAZORPAY_KEY_ID', '')
     grace = int(os.environ.get('SOFTWARE_BILLING_GRACE_DAYS', '7'))
@@ -41,6 +50,7 @@ def get_billing_config():
                 or not re.fullmatch(r'plan_[A-Za-z0-9]+', plan.get('razorpay_plan_id', ''))):
             raise ValueError('Invalid software plan configuration.')
         seen.add(plan['code'])
-    return BillingConfig(mode, key, os.environ.get('RAZORPAY_KEY_SECRET', ''),
-                         os.environ.get('RAZORPAY_WEBHOOK_SECRET', ''), tuple(plans), grace,
-                         os.environ.get('SOFTWARE_TERMS_VERSION', 'software-v1'))
+    return BillingConfig(mode=mode, key_id=key, key_secret=os.environ.get('RAZORPAY_KEY_SECRET', ''),
+                         webhook_secret=os.environ.get('RAZORPAY_WEBHOOK_SECRET', ''), plans=tuple(plans),
+                         grace_days=grace, terms_version=os.environ.get('SOFTWARE_TERMS_VERSION', 'software-v1'),
+                         environment=environment, local_access=local_access)

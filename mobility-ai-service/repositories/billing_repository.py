@@ -13,7 +13,9 @@ class BillingRepository(IdentityRepository):
         return access
 
     def organization(self, db, organization_id, lock=False):
-        return db.execute('SELECT * FROM organizations WHERE id=%s' + (' FOR UPDATE' if lock else ''), (organization_id,)).fetchone()
+        return db.execute("SELECT o.*, COALESCE(NULLIF(g.configuration->>'display_name',''), o.name) AS workspace_name "
+                          'FROM organizations o LEFT JOIN gym_profiles g ON g.organization_id=o.id '
+                          'WHERE o.id=%s' + (' FOR UPDATE OF o' if lock else ''), (organization_id,)).fetchone()
 
     def create_business(self, db, user_id, request_id, name, kind):
         self.lock_recipient(db, (f'onboarding:{user_id}:{request_id}',))
@@ -23,6 +25,20 @@ class BillingRepository(IdentityRepository):
             if previous['name'] != name or previous['business_type'] != kind:
                 raise ValueError('This onboarding request was already used with different details.')
             return previous['organization_id']
+        # Serialize all business-creation requests for this owner, including
+        # requests using different idempotency keys, before checking the limit.
+        self.lock_recipient(db, (f'business-owner:{user_id}',))
+        if kind == 'gym':
+            existing = db.execute(
+                "SELECT 1 FROM organization_relationships r "
+                "JOIN organization_staff_roles s ON s.organization_id=r.organization_id AND s.relationship_id=r.id "
+                "JOIN organizations o ON o.id=r.organization_id "
+                "WHERE r.user_id=%s AND r.status='active' AND o.status='active' "
+                "AND o.organization_type='gym' AND s.role='owner' AND s.revoked_at IS NULL LIMIT 1",
+                (user_id,),
+            ).fetchone()
+            if existing:
+                raise ValueError('Each owner account can have only one active gym business.')
         org = db.execute('INSERT INTO organizations(name,organization_type) VALUES(%s,%s) RETURNING id', (name, kind)).fetchone()['id']
         rel = db.execute('INSERT INTO organization_relationships(organization_id,user_id) VALUES(%s,%s) RETURNING id', (org, user_id)).fetchone()['id']
         db.execute("INSERT INTO organization_staff_roles(organization_id,relationship_id,role) VALUES(%s,%s,'owner')", (org, rel))

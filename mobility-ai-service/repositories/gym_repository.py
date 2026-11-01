@@ -24,6 +24,9 @@ class GymRepository(IdentityRepository):
         db.execute('INSERT INTO gym_setup_audit(organization_id,revision,actor_user_id,configuration) '
                    'VALUES(%s,%s,%s,%s)', (org, revision, actor, Jsonb(config)))
 
+    def rename_organization(self, db, org, name):
+        db.execute('UPDATE organizations SET name=%s WHERE id=%s', (name, org))
+
     def trainers(self, db, org):
         # Only identifiers and deliberately configured public names enter the public catalogue.
         rows = db.execute("SELECT r.id, u.email FROM organization_relationships r JOIN users u ON u.id=r.user_id "
@@ -37,10 +40,6 @@ class GymRepository(IdentityRepository):
                           'ON r.id=p.relationship_id AND r.organization_id=p.organization_id '
                           "WHERE p.organization_id=%s AND r.user_id=%s AND r.status='active' "
                           'ORDER BY p.created_at DESC LIMIT 100', (org, user)).fetchall()
-
-    def audit(self, db, org):
-        return db.execute('SELECT revision,actor_user_id,created_at FROM gym_setup_audit '
-                          'WHERE organization_id=%s ORDER BY revision DESC LIMIT 25', (org,)).fetchall()
 
     def asset_matches(self, db, identifier, org, kind):
         return db.execute('SELECT id FROM gym_assets WHERE id=%s AND organization_id=%s AND kind=%s',
@@ -83,4 +82,5 @@ class GymRepository(IdentityRepository):
 
     def admin_purchases(self, db, org):
         return db.execute('SELECT id,snapshot,amount_paise,currency,status,created_at FROM gym_pending_purchases '
-                          'WHERE organization_id=%s ORDER BY created_at DESC LIMIT 100', (org,)).fetchall()
+                          "WHERE organization_id=%s AND status IN ('pending','awaiting_verification','rejected') "
+                          'ORDER BY created_at DESC LIMIT 500', (org,)).fetchall()

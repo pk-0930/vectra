@@ -30,10 +30,11 @@ class WebWorkspaceTests(unittest.TestCase):
         self.repo.reports.assert_called_once_with(self.access, date(2026, 10, 1), date(2026, 10, 20), date(2026, 10, 20))
         with self.assertRaises(ValueError): self.service.reports(self.access, date(2024, 1, 1), date(2026, 1, 1))
 
-    def test_only_owner_can_pause_new_purchases(self):
+    def test_admin_can_pause_new_purchases(self):
         self.access.roles = {'admin'}
-        with self.assertRaises(AccessDenied): self.service.set_rollout(self.access, False)
-        self.repo.set_rollout.assert_not_called()
+        self.service.set_rollout(self.access, False)
+        self.access.require_admin.assert_called_once_with()
+        self.repo.set_rollout.assert_called_once_with(self.access, False)
 
     def test_release_check_fails_closed_without_configuration(self):
         with patch.dict('os.environ', {}, clear=True):

@@ -2,13 +2,13 @@
 @font-face { font-family: 'Barlow Condensed'; src: url('/fonts/barlow-condensed-600-latin.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
 @font-face { font-family: 'Barlow Condensed'; src: url('/fonts/barlow-condensed-700-latin.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; }
 * { box-sizing: border-box; }
-:root { color-scheme: light; font-family: var(--font-ui); font-size: 14px; color: var(--color-text); background: var(--color-background); font-synthesis: none; text-rendering: optimizeLegibility; }
-body { margin: 0; min-width: 320px; line-height: 1.5; }
+:root { color-scheme: light; font-family: var(--font-ui); font-size: 14px; color: var(--color-text); background: var(--app-background-base, var(--color-background)); font-synthesis: none; text-rendering: optimizeLegibility; }
+body { margin: 0; min-width: 320px; line-height: 1.5; background: var(--app-background-base, var(--color-background)); }
 button, input, select, textarea { font: inherit; }
-button { min-height: 44px; cursor: pointer; transition: background var(--motion-fast), border-color var(--motion-fast); }
+button { min-height: 44px; cursor: pointer; transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease); }
 button:disabled { opacity: .55; cursor: not-allowed; }
-button:not(:disabled):hover { filter: brightness(.97); }
-:focus-visible { outline: 3px solid var(--color-info); outline-offset: 3px; }
+button:not(:disabled):not(.button):hover { filter: brightness(.97); }
+:focus-visible { outline: 3px solid var(--color-brandText); outline-offset: 3px; }
 h1, h2, h3, p { overflow-wrap: anywhere; }
 h1 { font-size: clamp(26px, 3vw, 32px); font-weight: 700; letter-spacing: -.04em; line-height: 1.15; margin: 0; }
 h2 { font-size: 20px; letter-spacing: -.025em; line-height: 1.3; }
@@ -16,7 +16,8 @@ h3 { font-size: 16px; letter-spacing: -.015em; }
 p { color: var(--color-muted); }
 a { color: var(--color-brandText); text-underline-offset: 3px; }
 input:not([type=checkbox]):not([type=radio]), select, textarea { border: 1px solid var(--color-controlBorder); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); padding: 10px var(--space-3); min-height: 44px; min-width: 0; max-width: 100%; }
-input[type=checkbox], input[type=radio] { accent-color: var(--color-brandText); width: 18px; height: 18px; flex-shrink: 0; }
+select { appearance: none; padding-right: 40px !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23667085' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 16px; }
+input[type=checkbox], input[type=radio] { accent-color: var(--color-brand); width: 18px; height: 18px; flex-shrink: 0; }
 input::file-selector-button { border: 0; background: var(--color-surfaceSubtle); border-radius: var(--radius-sm); padding: var(--space-2); margin-right: 10px; font: inherit; color: var(--color-text); cursor: pointer; }
 textarea { resize: vertical; }
 label { font-size: 13px; font-weight: 600; }
@@ -25,11 +26,16 @@ strong, table, .metric-value, .billing-price { font-variant-numeric: tabular-num
 [role=alert] { color: var(--color-danger); }
 .skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; background: var(--color-charcoal); color: var(--color-onDark); padding: var(--space-3); }
 .skip-link:focus { top: 12px; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 10px var(--space-4); border: 1px solid transparent; border-radius: var(--radius-md); font-weight: 600; text-decoration: none; }
-.button--primary { background: var(--color-brand); color: var(--color-onBrand); border-color: var(--color-brandText); }
-.button--primary:not(:disabled):hover { background: var(--color-brandHover); }
-.button--secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-controlBorder); }
-.button--tertiary { background: transparent; color: var(--color-brandText); }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 10px 20px; min-height: 44px; border: 1px solid transparent; border-radius: 10px; font-size: 14px; font-weight: 600; line-height: 1.25; text-decoration: none; box-shadow: none; }
+.button--large { min-height: 48px; }
+.button--primary { background: var(--button-primary-bg); color: var(--button-primary-text); border-color: transparent; }
+.button--primary svg { color: var(--button-primary-text); }
+.button--primary:not(:disabled):hover { background: var(--button-primary-hover); color: var(--button-primary-text); filter: none; }
+.button--primary:not(:disabled):active { background: var(--button-primary-pressed); }
+.button--secondary { background: var(--button-secondary-bg); color: var(--button-secondary-text); border-color: var(--button-secondary-border); }
+.button--secondary:not(:disabled):hover { background: var(--button-secondary-hover); filter: none; }
+.button--tertiary { background: transparent; color: var(--button-secondary-text); }
+.button--tertiary:not(:disabled):hover { background: var(--button-tertiary-hover); color: var(--button-secondary-text); filter: none; }
 .button--danger { background: var(--color-dangerSurface); color: var(--color-danger); border-color: var(--color-dangerBorder); }
 .icon-button { width: 44px; padding: var(--space-2); flex-shrink: 0; }
 .eyebrow, .identity-brand { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .15em; color: var(--color-brandText); margin: 0 0 var(--space-3); }

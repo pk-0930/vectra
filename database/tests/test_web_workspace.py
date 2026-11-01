@@ -7,6 +7,7 @@ from unittest.mock import patch
 import test_organization_foundations as foundations
 import test_pt_appointments as pt_tests
 from repositories.access_repository import AccessDenied, ResourceNotFound
+from repositories.billing_repository import BillingRepository
 from services.web_workspace_service import WebWorkspaceService
 from services.membership_service import today_india
 from services.plan_service import PlanService
@@ -35,6 +36,27 @@ class WebWorkspaceTests(foundations.DisposablePostgresTests):
     def setUp(self):
         pt_tests.PtTests.setUp(self)
         self.web = WebWorkspaceService()
+
+    def test_owner_gym_limit_is_serialized_and_coaching_businesses_remain_allowed(self):
+        with self.repo.transaction() as db:
+            owner = self.new_user(db)
+        billing = BillingRepository(self.config)
+
+        def create_gym(_):
+            try:
+                with billing.transaction() as db:
+                    return billing.create_business(db, owner['id'], uuid4(), 'Independent Gym', 'gym')
+            except ValueError:
+                return None
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            gyms = list(pool.map(create_gym, range(2)))
+        self.assertEqual(sum(organization_id is not None for organization_id in gyms), 1)
+        with billing.transaction() as db:
+            coaching_id = billing.create_business(db, owner['id'], uuid4(), 'Online Coaching', 'coaching')
+            with self.assertRaisesRegex(ValueError, 'only one active gym'):
+                billing.create_business(db, owner['id'], uuid4(), 'Second Gym', 'gym')
+        self.assertIsNotNone(coaching_id)
 
     def test_inbox_payment_retry_read_scope_and_pagination(self):
         purchase = self.pt_purchase()

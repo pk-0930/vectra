@@ -1,39 +1,88 @@
-# Vectra Performance OS
+# Vectra Design System — Volt Performance Light
 
-The application uses the Volt Performance design from `Specs/UI_VOLT_LIME.MD`. The user authorized the complete application rollout, including replacing the earlier blue theme. This is a presentation refactor: gym-management features, backend APIs, tenancy, billing policy and data contracts remain unchanged.
+The current visual direction is premium light SaaS with an athletic soul. Use clean neutral surfaces, readable Inter typography, and selective lime accents. Preserve existing routes, role-aware navigation, workflows, API integrations and component APIs when extending the interface. Historical dark-theme guidance in this document is superseded by these current rules.
 
-## Foundations
+## Foundations and tokens
 
-`vectra-ui/src/design-system/tokens.ts` is the source of truth for palette, typography families, spacing, radii, motion and shadows. Values are platform-neutral. `installTokens()` installs the web CSS properties once at startup. `theme.ts` adapts these same values for existing inline React styles; do not maintain a second palette there. Native apps may reuse token values, not DOM components or the installer.
+`vectra-ui/src/design-system/tokens.ts` is the platform-neutral source for palette, typography, spacing, radii, motion and shadows. `installTokens()` exposes the values as CSS custom properties. `vectra-ui/src/theme.ts` adapts the same tokens for legacy inline styles; do not create another palette there. Native apps may reuse token values, not DOM components or the web installer.
 
-- Brand: volt `#C9FF35`; charcoal `#11171B`; graphite `#1C252A`.
-- Work surfaces: off-white background, white cards and neutral separators.
-- Brand controls: lime fill with charcoal text. Use the dark `brandText` token for text on light surfaces. Never use bright lime text on white.
-- Semantic status: dedicated success, warning, danger and information foreground/background pairs. A lime action or selected state does not mean success.
-- Analysis: cyan accents on suitable dark surfaces, or the darker information token for legible text/icons on light surfaces. Orange is reserved for future meaningful performance emphasis.
-- Inter handles UI, financial information and dense data. Barlow Condensed is limited to selected athletic headings. Numerals use tabular spacing where comparison matters.
-- Spacing: 4, 8, 12, 16, 20, 24, 32 and 40px. Radii: 6, 10, 14 and 18px. Use the tokens instead of introducing arbitrary palettes or spacing scales.
-- Fonts are served locally from `public/fonts/` with swap behavior and system fallbacks. Inter's Latin variable font and two Barlow weights total approximately 93 KB uncompressed. License files are included. Other scripts/glyphs use system fallback fonts.
+| Purpose | Token | Value |
+| --- | --- | --- |
+| Primary action | `--button-primary-bg` | `#172022` |
+| Primary action text | `--button-primary-text` | `#FFFFFF` |
+| Action hover | `--button-primary-hover` | `#293638` |
+| Action pressed | `--button-primary-pressed` | `#101719` |
+| Secondary action | `--button-secondary-bg` | `#FFFFFF` |
+| Secondary border | `--button-secondary-border` | `#D9E1DD` |
+| Tertiary hover | `--button-tertiary-hover` | `#F3F6F2` |
+| Brand highlight | `--color-brand-highlight` | `#C9FF51` |
+| Selected / subtle surface | `--color-brand-subtle` | `#F2F9E6` |
+| Workspace background | `--color-background` | `#FAFBFC` |
+| App background base | `--app-background-base` | `#FAFBFC` |
+| Authenticated shell gradient | `--app-background-gradient` | `linear-gradient(135deg, #EAF6D9 0%, #F5FAEF 42%, #FAFBFC 85%)` |
+| Surface / card | `--color-surface` | `#FFFFFF` |
+| Navigation | `--sidebar-bg` | `#FFFFFF` |
+| Selected navigation | `--sidebar-item-active-bg` | `#172022` |
+| Primary text | `--color-text-primary` | `#151A20` |
+| Secondary text | `--color-text-secondary` | `#667085` |
+| Border | `--color-border` | `#E3E7E2` |
+| Strong border | `--color-border-strong` | `#C7CEC7` |
 
-## Components and layouts
+`--app-background-base` and `--app-background-gradient` define the authenticated application canvas. `design-system/AppShell.tsx` applies the diagonal pearl lime gradient once to `.shell-content`, behind page content; the gradient does not repeat and reaches the base `#FAFBFC` color by its final stop. The app canvas uses the same base as a fallback. Keep standard cards, forms, tables, dialogs, the sidebar, and buttons on their solid existing surfaces. Standard cards use white. Navigation uses white inactive items and a rounded near-black selected item with white text and icons; there is no lime active indicator.
+
+The shared token installer also exposes `--gradient-hero`, `--gradient-pearl`, `--gradient-surface`, `--gradient-sage`, and `--gradient-brand` for focused feature treatments. Standard primary buttons share the sidebar's near-black fill, white text and icons, solid hover/pressed colors, and no border or shadow. Secondary buttons use white with a neutral border. Tertiary buttons remain transparent and use the neutral hover surface.
+
+Depth uses restrained shared shadows: card `0 2px 8px rgba(23, 32, 34, 0.03)`, hover `0 6px 18px rgba(23, 32, 34, 0.06)`, and elevated `0 12px 32px rgba(23, 32, 34, 0.08)`. Use dark foreground text on pale gradients and verify contrast for new pairs.
+
+Primary buttons use the near-black component tokens so they match selected navigation. Secondary and tertiary buttons use the neutral component tokens. Keep lime accents selective for brand identity. Keep success (`#168455`), warning, danger and information colors semantic; blue is not success. Analysis cyan is `#36DCE0`; performance orange is `#FF814A`. Chart series use lime, cyan, orange and neutral tones with labels and units.
+
+Semantic foregrounds use contrast-checked shades with subtle surfaces: success `#168455` on `#F8FCF9`, warning `#8C4C09` on `#FFF4DD`, danger `#B52B39` on `#FFF0F1`, and informational blue `#2563EB` on `#EDF5FD`. Keep labels/icons with these colors so status is never conveyed by color alone.
+
+Inter is the application font for navigation, forms, tables, business metrics and body copy. Barlow Condensed is reserved for selected athletic headings and milestones. Use tabular numerals for metrics and financial values. Fonts are served locally from `public/fonts/` with system fallbacks.
+
+The spacing scale remains 4, 8, 12, 16, 20, 24, 32 and 40px. Radii are 6, 10, 14 and 18px. Use the shared tokens rather than adding one-off palettes, radii or spacing scales. Standard UI motion is 150–200ms with the shared easing token; reduced-motion preferences disable transitions and animation.
+
+## Application shell and roles
+
+`design-system/AppShell.tsx` owns staff navigation and its responsive drawer. `components/SideNav.tsx` renders the same permission-aware menu on desktop and mobile. The role-aware shell keeps a white sidebar, dark inactive labels, muted inactive icons, a rounded near-black selected item with white content, white business surfaces, and the shared diagonal pearl lime gradient behind page content. Preserve current collapse/drawer behavior and keep the business/account controls in their existing location.
+
+The shared foundations support different priorities: owners need clear business information and efficient administration; trainers need client context and coaching workflows; members need progress and training milestones. Do not add new capabilities or simulated data as part of visual work. Keep administrative screens predominantly light, with the global gradient behind cards rather than applied to individual content surfaces.
+
+## Components and data visualization
 
 `design-system/components.tsx` exports:
 
-- `Button`: primary, secondary, tertiary, danger; standard 44px minimum height, disabled states and keyboard focus.
+- `Button`: primary, secondary, tertiary and destructive variants with visible focus and disabled states.
 - `PageHeader`: optional eyebrow, title, description and contextual actions.
-- `Card`: neutral bordered surface.
-- `StatusBadge`: neutral, success, warning, danger or info, always with a visible textual label.
-- `EmptyState`: explanation and an optional working next action.
-- `Skeleton`: announced loading state with no fabricated metrics.
-- `Dialog`: standard or drawer, native modal isolation, explicit Tab wrapping, Escape handling, close button, scroll containment and focus restoration.
+- `Card`: neutral bordered white surface with restrained shadow.
+- `StatusBadge`: neutral, success, warning, danger or information tone, always paired with a text label.
+- `EmptyState` and `Skeleton`: explanatory empty and announced loading states, without fabricated metrics.
+- `Dialog`: native modal or drawer with focus containment, Escape dismissal and focus restoration.
 
-`design-system/AppShell.tsx` owns the staff workspace navigation. `components/SideNav.tsx` renders the same permission-aware menu on desktop and in the mobile drawer. The business/account bar remains outside it so pending billing and identity states retain appropriate entry points. Billing, member and identity pages use the same tokens and controls without displaying unauthorized staff navigation.
+Existing complex client and analysis views retain their handlers and use the compatibility theme. `components/ProgressGallery.tsx` uses protected authenticated media for both thumbnails and enlarged views. Selected client states use the soft lime palette. Inputs keep visible boundaries and keyboard focus. Data views must use real values, units, time ranges and meaningful labels. Use compact comparisons and restrained chart decoration; do not infer a trend from one value. Pair color with labels, direction or another accessible cue.
 
-`components/ProgressGallery.tsx` renders dated check-in thumbnails and an enlarged dialog view. It uses `ProtectedImage` for both sizes: authenticated retrieval, no public URL fallback, abort handling and object-URL cleanup remain intact.
+## Athletic imagery
 
-Existing complex client/analysis renderers retain their handlers and use the compatibility theme. Responsive layout classes replace fixed grid assumptions. Do not introduce a new chart, date-picker or component dependency merely to fill the planned taxonomy. Build future components only when an implemented workflow requires them.
+Use athletic photography selectively when it adds context to a workflow and approved media is available. Favor athletes performing real movements, clear subjects, natural dramatic lighting and purposeful crops. Avoid generic stock imagery, repeated unrelated photos, fabricated progress imagery and decorative hero photos across administrative pages. Images need responsive sizing, descriptive alternate text, loading behavior and a useful fallback. Use exercise media for workout content and member imagery only where the application already has it.
 
-### Examples
+## Accessibility and responsive behavior
+
+Use semantic HTML, visible labels, logical heading order, descriptive image alternatives and visible keyboard focus. Keep text and controls readable against their surfaces; never rely on color alone for status. Preserve the 44px minimum interactive target and native form behavior. Test desktop, laptop, tablet and mobile layouts, including navigation, stacked cards, tables, tab overflow, image crops and forms. Keep touch layouts usable at 320px width. Respect `prefers-reduced-motion` and avoid perpetual animation.
+
+Computed contrast for core pairs (WCAG relative luminance):
+
+| Pair | Contrast |
+| --- | ---: |
+| Primary action / charcoal label | 14.29:1 |
+| Primary text / white | 17.05:1 |
+| Secondary text / workspace background | 4.74:1 |
+| Light text / charcoal sidebar | 17.13:1 |
+| Muted light text / charcoal sidebar | 10.40:1 |
+| Success / success surface | 4.54:1 |
+
+These token-pair checks are not a formal audit of every dynamic content combination. Verify contrast when adding new foreground/background pairings.
+
+## Examples
 
 ```tsx
 <PageHeader
@@ -46,9 +95,6 @@ Existing complex client/analysis renderers retain their handlers and use the com
   <StatusBadge tone="warning">Renewal grace period</StatusBadge>
   <p>Use the actual server-provided expiry date here.</p>
 </Card>
-<Dialog open={editing} title="Edit profile" onClose={closeEditor} drawer>
-  {/* Existing form, validation, loading and submit handlers */}
-</Dialog>
 ```
 
 ```css
@@ -57,57 +103,10 @@ Existing complex client/analysis renderers retain their handlers and use the com
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 ```
 
-## Interaction and accessibility
-
-Use real buttons for actions and links for navigation/downloads. Do not nest interactive elements inside a button or a clickable role-button container. Client section selectors are navigation buttons with `aria-pressed`; they do not claim ARIA tab semantics without implementing the corresponding keyboard pattern.
-
-Label form fields visibly, preserve native autocomplete and input validation, and render request errors inside the active modal as well as the page when appropriate. Disabled/loading actions retain explanatory text. Destructive actions use danger styling; staff-role removal and subscription cancellation show contextual confirmation dialogs.
-
-Use visible keyboard focus, maintain modal focus containment and return focus to the trigger when it still exists. Mobile navigation moves focus to the workspace when selecting a new page. The skip link targets the workspace. `prefers-reduced-motion` disables transitions/animation. No perpetual animation is used.
-
-Computed contrast for the main token pairs:
-
-| Pair | Ratio |
-| --- | ---: |
-| Main text / white | 17.49:1 |
-| Muted text / off-white | 5.43:1 |
-| Brand text / white | 7.63:1 |
-| Charcoal text / lime | 15.35:1 |
-| White text / charcoal | 17.24:1 |
-| Muted dark text / charcoal | 8.92:1 |
-| Success / success surface | 5.81:1 |
-| Warning / warning surface | 6.10:1 |
-| Danger / danger surface | 5.63:1 |
-| Information / information surface | 5.21:1 |
-| Control border / off-white | 3.04:1 |
-
-These checks cover the defined pairs, not a formal accessibility certification of every possible content combination. Keep status text/icons alongside colors. Decorative card borders are intentionally subtle; interactive controls use the stronger border token.
-
-## Responsive behavior
-
-- Desktop sidebar: 248px, sticky, no hover-triggered layout shift.
-- Below 1024px: modal navigation drawer with a visible menu control.
-- Four overview metrics on wide desktops; two below 1200px; one on the narrowest screens.
-- Client rail and workspace stack below 768px. The rail has its own bounded scroll region.
-- Dense analysis and profile pairs collapse when the workspace is narrow.
-- Tables scroll inside focusable, labeled regions. The page itself must not overflow horizontally.
-- Main actions wrap, titles and filenames wrap, and native form controls remain usable on phones.
-- Mobile inputs use 16px text. Use fluid widths and `minmax(0, 1fr)` for content grids.
-
-## Role and data rules
-
-Owners/admins have integrated business and coaching navigation. Trainers do not gain owner financial or business-access controls. People retain one account with business-scoped permissions; the workspace selector is shown only when there are multiple businesses. Member mode preserves its existing access-mode headers and the return-to-staff action.
-
-The overview shows API-backed client counts and a clearly bounded recent-analysis sample (latest 12). Loading or failed requests do not appear as successful zero-value metrics. No attendance, revenue, streaks, biomechanical scores or trend charts are invented. Sessions and insights remain honest coming-soon screens. Future chart work needs actual series, units, time ranges, baselines and a text/table alternative.
-
-Billing displays server access states and verified history. Browser checkout never grants entitlement. Pending, grace, read-only, legacy, cancellation and recovery behavior is unchanged. Existing client, plan, upload, protected-download, analysis, invitation and authentication handlers remain the source of behavior.
-
 ## Verification and extension
 
-Run `npm run lint` and `npm run build` in `vectra-ui`. Check desktop, tablet and phone layouts with both populated and empty states. Verify keyboard entry/exit, error feedback, protected assets and permission-specific navigation. Use isolated fixtures for design verification; never add demo records or synthetic metrics to functional application code.
-
-Before introducing a new UI pattern, reuse the components/tokens above and document any justified extension here. See `Specs/UI_VOLT_IMPLEMENTATION_REVIEW.md` for the completed rollout and verification boundary.
+Run `npm run lint` and `npm run build` in `vectra-ui`. Check dashboard, client profile, workout, nutrition, form analysis and authentication at desktop and mobile widths, keyboard interactions, reduced motion, real/empty/loading states and permission-specific navigation. Use the existing design-system components and tokens for future features, including gym management and payments. Keep backend APIs, database schemas and product workflows out of visual-only changes.

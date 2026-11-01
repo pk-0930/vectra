@@ -6,4 +6,5 @@ export type AppTab =
   | "clients"
   | "sessions"
   | "insights"
-  | "settings";
+  | "settings"
+  | "billing";

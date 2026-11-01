@@ -2,11 +2,24 @@ import unittest
 from unittest.mock import Mock
 
 from repositories.job_repository import PostgresJobRepository
+from repositories.access_repository import AccessDenied, AccessRepository
 from repositories.organization_repository import OrganizationRepository
 from repositories.platform_repository import PostgresPlatformRepository
 
 
 class OrganizationRepositoryTests(unittest.TestCase):
+    def test_admin_cannot_remove_admin_but_can_remove_trainer(self):
+        access = AccessRepository.__new__(AccessRepository)
+        access.admin = True
+        access.roles = {'admin'}
+        access._organization_id = 4
+        access.connection = Mock()
+        with self.assertRaises(AccessDenied):
+            access.revoke_role(9, 'admin')
+        access.connection.execute.assert_not_called()
+        access.revoke_role(9, 'trainer')
+        access.connection.execute.assert_called_once()
+
     def test_invalid_organization_context_is_rejected_before_database_access(self):
         for value in (None, True, False, 0, -1, "1"):
             with self.subTest(value=value), self.assertRaises(ValueError):

@@ -78,6 +78,21 @@ class WebWorkspaceRepository:
             'FROM gym_verified_payments WHERE organization_id=%s AND received_on BETWEEN %s AND %s GROUP BY method',
             (org, start, end),
         ).fetchall()
+        transactions = db.execute(
+            "SELECT p.id,jsonb_build_object('member_name',p.snapshot->>'member_name','plans',"
+            "(SELECT COALESCE(jsonb_agg(jsonb_build_object('name',plan->>'name','kind',plan->>'kind')),'[]'::jsonb) "
+            "FROM jsonb_array_elements(p.snapshot->'plans') AS plans(plan))) AS snapshot,"
+            "p.amount_paise,p.currency,p.status,p.created_at,v.method,v.reference,v.amount_paise AS paid_amount_paise,v.received_on "
+            "FROM gym_pending_purchases p "
+            "LEFT JOIN gym_verified_payments v ON v.organization_id=p.organization_id AND v.purchase_id=p.id "
+            "WHERE p.organization_id=%s AND p.status IN ('confirmed','refunded','superseded','cancelled') AND ("
+            "(v.received_on BETWEEN %s AND %s) OR "
+            "((p.created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN %s AND %s) OR "
+            "EXISTS(SELECT 1 FROM gym_payment_events e WHERE e.organization_id=p.organization_id AND e.purchase_id=p.id AND "
+            "(e.created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN %s AND %s)) "
+            "ORDER BY COALESCE(v.received_on,(p.created_at AT TIME ZONE 'Asia/Kolkata')::date) DESC,p.created_at DESC LIMIT 500",
+            (org, start, end, start, end, start, end),
+        ).fetchall()
         # Refund date is the recorded event date in India. Include refunds of unconfirmed
         # receipts separately so they cannot silently distort the verified-payment ledger.
         refunds = db.execute(
@@ -103,7 +118,7 @@ class WebWorkspaceRepository:
             "WHERE p.organization_id=%s AND plan->>'kind'='pt' AND "
             "(p.created_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN %s AND %s GROUP BY p.status", (org, start, end),
         ).fetchall()
-        return {'start': start, 'end': end, 'as_of': today, 'collections': collections, 'refunds': refunds,
+        return {'start': start, 'end': end, 'as_of': today, 'collections': collections, 'transactions': transactions, 'refunds': refunds,
                 'memberships': membership, 'pt_purchases': pt,
                 'purchases_enabled': self.rollout(access)['purchases_enabled']}
 

@@ -129,8 +129,11 @@ class GymOnboardingTests(foundations.DisposablePostgresTests):
         with self.assertRaises(ValueError), self.access(self.owner) as access: self.service.save(access, 1, changed, False)
         with self.access(self.admin) as access:
             self.cfg['description'] = 'Admin can manage branding'
-            saved = self.service.save(access, 1, self.cfg, False)
-            self.assertEqual(len(saved['audit']), 2)
+            self.service.save(access, 1, self.cfg, False)
+            audit_count = access.connection.execute(
+                'SELECT count(*) AS n FROM gym_setup_audit WHERE organization_id=%s',
+                (self.org,)).fetchone()['n']
+            self.assertEqual(audit_count, 2)
         with self.assertRaises(CatalogueChanged), self.access(self.owner) as access: self.service.save(access, 1, self.cfg, True)
         with self.assertRaises(AccessDenied), self.access(self.trainer) as access: self.service.setup(access)
         with self.assertRaises(AccessDenied), self.access(self.owner, member=True) as access: self.service.setup(access)
